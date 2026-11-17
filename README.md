@@ -5,7 +5,7 @@
 Wrap a car in Christmas lights and render it as ASCII. Or a tree, a rocket, a word, or any 3D model you drop in.
 It runs entirely in the browser: one HTML file, no build step, no server, nothing uploaded.
 
-**Try it:** https://YOUR-DOMAIN (replace this once the site is live)
+**Try it:** https://wrapinlights.vercel.app
 
 ## What you can do
 
@@ -23,14 +23,14 @@ This repository deploys as it is: no framework, no build step.
 1. Push it to GitHub.
 2. On vercel.com choose Add New > Project, import the repository, leave the framework preset on "Other", and deploy.
 3. In the project, open Analytics and enable Web Analytics. The page already reports visits and share events to it.
-4. In `index.html`, change the `og:image` tag from `og.png` to the full address (`https://YOUR-PROJECT.vercel.app/og.png`) and push, so link previews show the picture.
+4. If you fork this, change the address in `const SITE`, `og:image` and `og:url` in `index.html` to your own.
 
 Every later push redeploys automatically. Without GitHub, `npx vercel --prod` from this folder does the same thing.
 `vercel.json` only sets two headers, and `.vercelignore` keeps the Python folder and docs out of the deployment.
 
 To try it locally: `python3 -m http.server 8000`, then open http://localhost:8000.
 
-`const SITE = 'tinsel'` near the top of the script is the fallback name. Once hosted, videos are stamped with your domain automatically.
+`const SITE` near the top of the script is the address stamped on every video. On a custom domain the page uses that domain instead.
 
 ## How it spreads
 

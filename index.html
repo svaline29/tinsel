@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tinsel: put anyone's name in Christmas lights</title>
-<meta name="description" content="Type a name and watch it light up. Send it as a link or download the video. Free, nothing to install.">
-<meta property="og:title" content="Put anyone's name in Christmas lights">
-<meta property="og:description" content="Type a name, watch it light up, send it. Free, nothing to install.">
+<title>Wrap in Lights: any car, tree or 3D model in ASCII Christmas lights</title>
+<meta name="description" content="Wrap a car, a tree or your own 3D model in Christmas lights, drawn in ASCII. Download the video or send it as a link. Free, nothing to install.">
+<meta property="og:title" content="Wrap anything in ASCII Christmas lights">
+<meta property="og:description" content="Pick a car, a tree or your own 3D model. Watch it light up. Download the video or send it. Free.">
+<meta property="og:url" content="https://wrapinlights.vercel.app/">
 <meta property="og:type" content="website">
-<!-- Link previews need a full address here: change og.png to https://YOUR-DOMAIN/og.png once the site is live -->
-<meta property="og:image" content="og.png">
+<meta property="og:image" content="https://wrapinlights.vercel.app/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23070914'/%3E%3Ctext x='8' y='13' font-size='14' text-anchor='middle' fill='%23ffd66b' font-family='monospace'%3E*%3C/text%3E%3C/svg%3E">
 <style>
@@ -85,7 +85,7 @@
     </div>
   </div>
   <aside>
-    <h1><span>*</span> tinsel</h1>
+    <h1><span>*</span> wrap in lights</h1>
     <p class="tag">Wrap a car in Christmas lights. Or a tree, a rocket, your own 3D model. Download the video or send it as a link.</p>
 
     <h2>Pick a shape</h2>
@@ -162,7 +162,8 @@
 
 <script>
 'use strict';
-const SITE = 'tinsel';                    // shown in the corner of every video. Change it to your site's name.
+const SITE = 'wrapinlights.vercel.app';   // stamped at the top of every video, so people who see one can find the site
+const NAME = 'wrapinlights';              // short name used in the status line and in file names
 // Visitor counting on Vercel: switch on Web Analytics for the project and this starts reporting. It does nothing anywhere else.
 window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 if (location.protocol === 'https:') { const s = document.createElement('script'); s.defer = true; s.src = '/_vercel/insights/script.js'; document.head.appendChild(s); }
@@ -888,7 +889,7 @@ async function loadFiles(files) {
 // ================================================================ SAVING AND SENDING
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000); }
-const baseName = () => SITE + '-' + (S.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '_') || 'card');
+const baseName = () => NAME + '-' + (S.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '_') || 'card');
 let lastVideo = null;
 function record() {
   const btn = $('rec'), secs = Math.max(2, Math.min(60, +$('secs').value || 12)), no = 'This browser cannot record video. Send it as a link instead, or try Chrome, Edge or Safari on a computer.';
