@@ -97,6 +97,7 @@
     <select id="scene" hidden><option value="drive" selected>Driving through snow</option><option value="spin">Spinning on ice</option></select>
     <h2>Style</h2>
     <div class="btns" id="looks"></div>
+    <label class="chk"><input id="codeMain" type="checkbox" checked> Show the code at the bottom</label>
     <div class="cols">
       <label class="field">From<input id="from" type="text" maxlength="20" placeholder="you (optional)" autocomplete="off"></label>
       <label class="field">Caption<input id="caption" type="text" maxlength="40" value="MERRY CHRISTMAS"></label>
@@ -147,7 +148,7 @@
       <label class="chk"><input id="stars" type="checkbox" checked> Twinkling stars</label>
       <label class="chk"><input id="mirror" type="checkbox" checked> Reflection (spinning only)</label>
       <label class="chk"><input id="intro" type="checkbox" checked> Build it up from nothing</label>
-      <label class="chk"><input id="code" type="checkbox" checked> Show the code underneath</label>
+      <label class="chk"><input id="code" type="checkbox" checked> Show the code at the bottom</label>
 
       <h2>Video</h2>
       <label class="row two">Shape<select id="format"><option value="1080x1920">Vertical (Reels, TikTok, Shorts)</option><option value="1080x1080">Square</option><option value="1920x1080">Wide (YouTube)</option></select></label>
@@ -950,6 +951,8 @@ for (const id of ['format', 'cell']) $(id).addEventListener('input', resize);
 $('intro').addEventListener('input', () => { S.t0 = performance.now(); });
 $('ramp').addEventListener('input', setRamp);
 $('caption').addEventListener('input', buildCaption);
+$('codeMain').addEventListener('input', e => setVal('code', e.target.checked));           // the same switch lives in two places; keep them in step
+$('code').addEventListener('input', e => { $('codeMain').checked = e.target.checked; });
 let typing = 0;
 $('word').addEventListener('input', () => { if (S.preset === 'text') { clearTimeout(typing); typing = setTimeout(() => useText($('word').value, true), 200); } });
 $('word').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
