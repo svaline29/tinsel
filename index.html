@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tinsel: put anyone's name in Christmas lights</title>
+<meta name="description" content="Type a name and watch it light up. Send it as a link or download the video. Free, nothing to install.">
+<meta property="og:title" content="Put anyone's name in Christmas lights">
+<meta property="og:description" content="Type a name, watch it light up, send it. Free, nothing to install.">
+<meta property="og:type" content="website">
+<!-- Link previews need a full address here: change og.png to https://YOUR-DOMAIN/og.png once the site is live -->
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23070914'/%3E%3Ctext x='8' y='13' font-size='14' text-anchor='middle' fill='%23ffd66b' font-family='monospace'%3E*%3C/text%3E%3C/svg%3E">
+<style>
+  :root { --bg:#070914; --panel:#0d1020; --line:#222949; --ink:#c9d1e6; --dim:#7b87a8; --hot:#ffd66b; --red:#ff4b4b; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; -webkit-tap-highlight-color:transparent; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 370px; height:100vh; height:100dvh; }
+  #stage { position:relative; display:flex; align-items:center; justify-content:center; padding:14px; min-width:0; min-height:0; }
+  #cv { max-width:100%; max-height:100%; border:1px solid var(--line); border-radius:6px; background:var(--bg); cursor:grab; touch-action:pan-y; }
+  #cv:active { cursor:grabbing; }
+  #hint { position:absolute; left:0; right:0; top:22px; text-align:center; color:var(--dim); pointer-events:none; font-size:12px; animation:fade 9s forwards; }
+  @keyframes fade { 0%, 70% { opacity:1; } 100% { opacity:0; } }
+  #drop { position:absolute; inset:14px; display:none; align-items:center; justify-content:center; border:2px dashed var(--hot); border-radius:6px;
+          color:var(--hot); font-size:18px; background:rgba(7,9,20,.85); pointer-events:none; }
+  body.drag #drop { display:flex; }
+  #cta { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); width:min(92%,430px); background:rgba(13,16,32,.95); border:1px solid var(--hot);
+         border-radius:10px; padding:16px; text-align:center; box-shadow:0 12px 48px rgba(0,0,0,.7); animation:rise .5s ease-out; }
+  #cta p { margin:0 0 12px; color:#fff; font-size:15px; }
+  @keyframes rise { from { opacity:0; transform:translate(-50%, 16px); } to { opacity:1; transform:translate(-50%, 0); } }
+  aside { background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:18px 18px 28px; }
+  body.viewer main { grid-template-columns:1fr; } body.viewer aside, body.viewer #hint { display:none; } body.viewer #stage { padding:0; } body.viewer #cv { border:0; border-radius:0; }
+  h1 { font-size:22px; margin:0; color:#fff; letter-spacing:.04em; }
+  h1 span { color:var(--hot); }
+  .tag { color:var(--ink); margin:6px 0 14px; font-size:14px; line-height:1.4; }
+  h2 { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:16px 0 8px; font-weight:400; }
+  details h2 { padding-top:12px; border-top:1px solid var(--line); }
+  .field { display:block; margin:10px 0; color:var(--dim); font-size:11px; letter-spacing:.12em; text-transform:uppercase; }
+  .field input { display:block; margin-top:5px; letter-spacing:0; font-size:14px; padding:9px 10px; }
+  .field.big input { font-size:22px; padding:12px; border-color:var(--hot); color:#fff; text-transform:uppercase; font-weight:700; }
+  .field.big input::placeholder { color:#58618a; font-weight:400; }
+  .cols { display:grid; grid-template-columns:1fr 1.35fr; gap:10px; }
+  label.row { display:grid; grid-template-columns:104px minmax(0,1fr) 38px; align-items:center; gap:8px; margin:6px 0; }
+  label.row.two { grid-template-columns:104px minmax(0,1fr); }
+  label.chk { display:flex; align-items:center; gap:8px; margin:7px 0; }
+  output { color:var(--dim); text-align:right; }
+  input[type=range] { width:100%; accent-color:var(--hot); }
+  input[type=checkbox] { accent-color:var(--hot); width:16px; height:16px; }
+  select, input[type=text], input[type=number] { width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line); padding:7px; font:inherit; border-radius:5px; }
+  input:focus, select:focus, button:focus-visible { outline:2px solid var(--hot); outline-offset:1px; }
+  input[type=color] { width:100%; height:30px; padding:0; border:1px solid var(--line); background:var(--bg); border-radius:5px; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  button, .filebtn { background:var(--bg); color:var(--ink); border:1px solid var(--line); padding:9px 11px; font:inherit; border-radius:5px; cursor:pointer; }
+  button:hover, .filebtn:hover { border-color:var(--hot); color:#fff; }
+  button.on { border-color:var(--hot); color:var(--hot); background:rgba(255,214,107,.08); }
+  button.go { background:var(--hot); color:#1a1400; border-color:var(--hot); font-weight:700; flex:1 1 100%; padding:14px; font-size:15px; }
+  button.go.alt { background:transparent; color:var(--hot); }
+  button.go:disabled { background:var(--red); border-color:var(--red); color:#fff; cursor:default; }
+  .filebtn { display:block; text-align:center; border-style:dashed; color:var(--dim); margin:6px 0; }
+  .filebtn input { display:none; }
+  #linkbox { margin:6px 0; font-size:12px; color:var(--hot); }
+  #status { color:var(--dim); min-height:1.4em; margin:8px 0 0; }
+  #status.err { color:var(--red); }
+  .note, details { color:var(--dim); font-size:12px; margin:10px 0 0; }
+  details > summary { cursor:pointer; color:var(--ink); padding:8px 0; font-size:13px; }
+  details ul { margin:6px 0 0; padding-left:18px; }
+  a { color:var(--hot); }
+  @media (max-width:860px) { main { grid-template-columns:1fr; grid-template-rows:54vh auto; height:auto; } aside { border-left:0; border-top:1px solid var(--line); } #hint { display:none; } #stage { padding:8px; }
+    body.viewer main { grid-template-rows:100vh; grid-template-rows:100dvh; } button, .filebtn { padding:12px 13px; } select, input[type=text] { font-size:16px; } .field input { font-size:16px; } }
+</style>
+</head>
+<body>
+<main>
+  <div id="stage">
+    <canvas id="cv" width="1080" height="1920" aria-label="Animated preview"></canvas>
+    <div id="hint">drag to turn it &middot; drop a 3D file anywhere to use your own</div>
+    <div id="drop">Drop a .glb, .obj or .stl file</div>
+    <div id="cta" hidden>
+      <p id="ctaText"></p>
+      <div class="btns"><button id="ctaMake" class="go">Make one for someone</button></div>
+      <div class="btns" style="justify-content:center"><button id="ctaReplay">Watch again</button></div>
+    </div>
+  </div>
+  <aside>
+    <h1><span>*</span> tinsel</h1>
+    <p class="tag">Wrap a car in Christmas lights. Or a tree, a rocket, your own 3D model. Download the video or send it as a link.</p>
+
+    <h2>Pick a shape</h2>
+    <div class="btns" id="gallery"></div>
+    <label class="field" id="wordRow" hidden>Your word<input id="word" type="text" maxlength="14" placeholder="type a word or a name" autocomplete="off" spellcheck="false" enterkeyhint="done"></label>
+    <label class="row two">Colour<input id="paint" type="color" value="#d41a1f"></label>
+    <h2>Scene</h2>
+    <div class="btns" id="scenes"></div>
+    <select id="scene" hidden><option value="drive" selected>Driving through snow</option><option value="spin">Spinning on ice</option></select>
+    <h2>Style</h2>
+    <div class="btns" id="looks"></div>
+    <div class="cols">
+      <label class="field">From<input id="from" type="text" maxlength="20" placeholder="you (optional)" autocomplete="off"></label>
+      <label class="field">Caption<input id="caption" type="text" maxlength="40" value="MERRY CHRISTMAS"></label>
+    </div>
+
+    <div class="btns" style="margin-top:12px">
+      <button id="rec" class="go">Download the video</button>
+      <button id="shareVid" class="go alt" hidden>Share the video</button>
+      <button id="send" class="go alt">Send it as a link</button>
+    </div>
+    <input id="linkbox" type="text" readonly hidden aria-label="Your link">
+    <p id="status"></p>
+    <div class="btns"><button id="shuffle">Surprise me</button><button id="replay">Replay</button><button id="png">Save image</button></div>
+
+    <details id="custom"><summary>Customize everything</summary>
+      <h2>Your own 3D model</h2>
+      <label class="filebtn">Choose a 3D file (.glb .obj .stl), or drop one anywhere<input id="file" type="file" accept=".glb,.obj,.mtl,.stl" multiple></label>
+      <div class="btns">
+        <button id="bUp" title="Use this if the model is lying on its side">Stand it up</button>
+        <button id="bTurn" title="Turn the model a quarter turn">Turn 90&deg;</button>
+        <button id="bFlip" title="Use this if it drives backwards">Flip direction</button>
+      </div>
+      <label class="chk"><input id="repaint" type="checkbox"> Repaint the body with the colour above</label>
+      <label class="chk"><input id="twoSided" type="checkbox"> Fix a see-through or inside-out model</label>
+      <details><summary>Where do I get 3D models?</summary>
+        <ul>
+          <li><a href="https://sketchfab.com/search?features=downloadable&type=models" target="_blank" rel="noopener">Sketchfab</a>: tick "Downloadable", download as <b>glTF</b>, use the .glb</li>
+          <li><a href="https://poly.pizza" target="_blank" rel="noopener">Poly Pizza</a> and <a href="https://kenney.nl/assets" target="_blank" rel="noopener">Kenney</a>: free low-poly models</li>
+          <li><a href="https://www.printables.com" target="_blank" rel="noopener">Printables</a>: 3D-print files (.stl)</li>
+        </ul>
+        Check each model's licence before you post. Most free ones ask for a credit in your caption.
+      </details>
+
+      <h2>Lights</h2>
+      <label class="row two">Arrangement<select id="mode"><option value="outline">Along its edges</option><option value="spiral">Wrapped string</option><option value="scatter">Scattered</option><option value="both">Both</option><option value="none">None</option></select></label>
+      <label class="row two">Colours<select id="palette"><option value="xmas">Multicolour</option><option value="warm">Warm white</option><option value="redgreen">Red + green</option><option value="candy">Candy cane</option><option value="ice">Ice blue</option></select></label>
+      <label class="row">Bulbs<input id="bulbs" type="range" min="40" max="700" step="10" value="260"><output></output></label>
+      <label class="row">Turns<input id="turns" type="range" min="2" max="26" step="1" value="10"><output></output></label>
+      <label class="row two">Wrap around<select id="axis"><option value="auto">Longest side</option><option value="y">Its height</option><option value="len">Its length</option></select></label>
+      <label class="row">Blink<input id="blink" type="range" min="0" max="12" step="0.5" value="5"><output></output></label>
+      <label class="row two">Pulse to music<select id="bpm"><option value="0">Off</option><option value="90">90 beats a minute</option><option value="100">100</option><option value="107">107 (Last Christmas)</option><option value="120">120</option><option value="128">128</option><option value="140">140</option></select></label>
+      <label class="chk"><input id="topper" type="checkbox"> Star on top</label>
+
+      <h2>Scene</h2>
+      <label class="row">Speed<input id="spin" type="range" min="-1.5" max="1.5" step="0.05" value="0.55"><output></output></label>
+      <label class="row">Zoom<input id="zoom" type="range" min="0.5" max="1.8" step="0.05" value="1"><output></output></label>
+      <label class="row">Snow<input id="snow" type="range" min="0" max="1500" step="50" value="450"><output></output></label>
+      <label class="chk"><input id="stars" type="checkbox" checked> Twinkling stars</label>
+      <label class="chk"><input id="mirror" type="checkbox" checked> Reflection (spinning only)</label>
+      <label class="chk"><input id="intro" type="checkbox" checked> Build it up from nothing</label>
+      <label class="chk"><input id="code" type="checkbox" checked> Show the code underneath</label>
+
+      <h2>Video</h2>
+      <label class="row two">Shape<select id="format"><option value="1080x1920">Vertical (Reels, TikTok, Shorts)</option><option value="1080x1080">Square</option><option value="1920x1080">Wide (YouTube)</option></select></label>
+      <label class="row two">Characters<select id="cell"><option value="5">Tiny (most detail)</option><option value="6" selected>Small</option><option value="8">Medium</option><option value="10">Large</option><option value="12">Chunky (retro)</option></select></label>
+      <label class="row two">Character set<select id="ramp"><option value=" .:-=+*#%@">Classic  .:-=+*#%@</option><option value=" .,:;i1tfLCG08@">Dense  .,:;i1tfLCG08@</option><option value=" .:01">Binary  .:01</option><option value=" .'`^*xX#">Frost  .'`^*xX#</option></select></label>
+      <label class="row">Points<input id="points" type="range" min="8000" max="120000" step="2000" value="44000"><output></output></label>
+      <label class="row two">Seconds<input id="secs" type="number" min="2" max="60" value="12"></label>
+    </details>
+    <p class="note">Free. Nothing is uploaded: it all runs in your browser. Keep this tab open and visible while a video records.</p>
+  </aside>
+</main>
+
+<script>
+'use strict';
+const SITE = 'tinsel';                    // shown in the corner of every video. Change it to your site's name.
+// Visitor counting on Vercel: switch on Web Analytics for the project and this starts reporting. It does nothing anywhere else.
+window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+if (location.protocol === 'https:') { const s = document.createElement('script'); s.defer = true; s.src = '/_vercel/insights/script.js'; document.head.appendChild(s); }
+
+const PALETTES = {
+  xmas: [[1,.15,.15],[.2,1,.3],[.25,.5,1],[1,.85,.25],[1,.35,.9]],
+  warm: [[1,.82,.45]], redgreen: [[1,.12,.12],[.15,1,.3]], candy: [[1,.15,.15],[1,1,1]],
+  ice: [[.55,.8,1],[.85,.95,1],[.3,.5,1]],
+};
+const BG = [7, 9, 20], TAU = 6.2831853;
+const $ = id => document.getElementById(id);
+const wrap = (v, lo, span) => ((v - lo) % span + span) % span + lo;
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+
+// ---------------------------------------------------------------- random
+function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const gauss = r => Math.sqrt(-2 * Math.log(1 - r() + 1e-12)) * Math.cos(TAU * r());
+
+// ================================================================ READING MODEL FILES
+// Every reader returns { T: Float32Array (9 numbers per triangle), UV?, M? (material per triangle), mats? }
+function parseOBJ(text, mtlText) {
+  const V = [], T = [], M = [], names = new Map(); let cur = 0;
+  const matId = n => { if (!names.has(n)) names.set(n, names.size + 1); return names.get(n); };
+  for (const raw of text.split('\n')) {
+    const c0 = raw.charCodeAt(0), c1 = raw.charCodeAt(1);
+    if (c0 === 118 && c1 === 32) { const p = raw.trim().split(/\s+/); V.push(+p[1], +p[2], +p[3]); }          // v
+    else if (c0 === 102 && c1 === 32) {                                                                        // f
+      const p = raw.trim().split(/\s+/), ids = [];
+      for (let i = 1; i < p.length; i++) { const k = parseInt(p[i], 10); ids.push(k > 0 ? k - 1 : V.length / 3 + k); }
+      for (let i = 1; i + 1 < ids.length; i++) { M.push(cur);
+        for (const k of [ids[0], ids[i], ids[i + 1]]) T.push(V[3 * k], V[3 * k + 1], V[3 * k + 2]); }
+    } else if (raw.startsWith('usemtl')) cur = matId(raw.slice(6).trim());
+  }
+  const out = { T: new Float32Array(T) };
+  if (mtlText && names.size) {
+    const kd = new Map(); let name = null;
+    for (const raw of mtlText.split('\n')) { const p = raw.trim().split(/\s+/);
+      if (p[0] === 'newmtl') name = p.slice(1).join(' '); else if (p[0] === 'Kd' && name) kd.set(name, [+p[1], +p[2], +p[3]]); }
+    const mats = [{ rgb: [.8, .8, .82], name: '' }];
+    for (const [n] of names) mats.push({ rgb: kd.get(n) || [.8, .8, .82], name: n });
+    out.M = new Uint16Array(M); out.mats = mats;
+  }
+  return out;
+}
+function parseSTL(buf) {
+  const dv = new DataView(buf), cnt = buf.byteLength >= 84 ? dv.getUint32(80, true) : -1;
+  if (buf.byteLength === 84 + cnt * 50) {
+    const T = new Float32Array(cnt * 9);
+    for (let i = 0; i < cnt; i++) for (let k = 0; k < 9; k++) T[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
+    return { T };
+  }
+  const T = [], re = /vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, text = new TextDecoder().decode(buf); let m;
+  while ((m = re.exec(text))) T.push(+m[1], +m[2], +m[3]);
+  return { T: new Float32Array(T) };
+}
+async function parseGLB(buf) {
+  const dv = new DataView(buf);
+  if (buf.byteLength < 20 || dv.getUint32(0, true) !== 0x46546C67) throw new Error('That does not look like a .glb file.');
+  let off = 12, json = null, bin = -1;
+  while (off + 8 <= buf.byteLength) { const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true), st = off + 8;
+    if (type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, st, len)));
+    else if (type === 0x004E4942 && bin < 0) bin = st;
+    off = st + len; }
+  if (!json || bin < 0) throw new Error('That .glb file has no model data inside.');
+  if ((json.extensionsRequired || []).concat(json.extensionsUsed || []).some(e => /draco|meshopt/i.test(e)))
+    throw new Error('That .glb is compressed (Draco or Meshopt). Download the original / uncompressed glTF version instead.');
+  const SZ = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 }, NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+  const get = (ct, o) => ct === 5126 ? dv.getFloat32(o, true) : ct === 5125 ? dv.getUint32(o, true) : ct === 5123 ? dv.getUint16(o, true)
+    : ct === 5121 ? dv.getUint8(o) : ct === 5122 ? dv.getInt16(o, true) : dv.getInt8(o);
+  const read = (i, Ctor) => { const a = json.accessors[i], nc = NC[a.type] || 1, out = new Ctor(a.count * nc);
+    if (a.bufferView === undefined) return out;
+    const bv = json.bufferViews[a.bufferView]; if (bv.buffer) throw new Error('That .glb keeps its data in separate files, which is not supported.');
+    const sz = SZ[a.componentType], stride = bv.byteStride || sz * nc, base = bin + (bv.byteOffset || 0) + (a.byteOffset || 0);
+    const k = a.normalized ? ({ 5121: 1 / 255, 5123: 1 / 65535, 5120: 1 / 127, 5122: 1 / 32767 })[a.componentType] || 1 : 1;
+    for (let j = 0; j < a.count; j++) for (let c = 0; c < nc; c++) out[j * nc + c] = get(a.componentType, base + j * stride + c * sz) * k;
+    return out; };
+  const mul = (a, b) => { const o = new Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3]; return o; };
+  const local = n => { if (n.matrix) return n.matrix;
+    const [x, y, z, w] = n.rotation || [0, 0, 0, 1], [sx, sy, sz] = n.scale || [1, 1, 1], t = n.translation || [0, 0, 0];
+    return [(1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
+            2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
+            2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0, t[0], t[1], t[2], 1]; };
+  const items = []; let nt = 0, anyUV = false;
+  const walk = (i, Mx, depth) => { const n = json.nodes[i]; if (!n || depth > 64) return; const Wm = mul(Mx, local(n));
+    if (n.mesh !== undefined) for (const p of json.meshes[n.mesh].primitives) {
+      if ((p.mode === undefined || p.mode === 4) && p.attributes && p.attributes.POSITION !== undefined) { items.push({ p, Wm });
+        nt += Math.floor((p.indices !== undefined ? json.accessors[p.indices].count : json.accessors[p.attributes.POSITION].count) / 3);
+        if (p.attributes.TEXCOORD_0 !== undefined) anyUV = true; } }
+    for (const c of n.children || []) walk(c, Wm, depth + 1); };
+  const I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], sc = json.scenes && json.scenes[json.scene || 0];
+  for (const r of (sc ? sc.nodes : (json.nodes || []).map((_, i) => i))) walk(r, I4, 0);
+  if (!nt) throw new Error('No triangles found in that file.');
+  const T = new Float32Array(nt * 9), UV = anyUV ? new Float32Array(nt * 6) : null, M = new Uint16Array(nt), nm = (json.materials || []).length; let w = 0;
+  for (const { p, Wm } of items) {
+    const pos = read(p.attributes.POSITION, Float32Array), uv = p.attributes.TEXCOORD_0 !== undefined ? read(p.attributes.TEXCOORD_0, Float32Array) : null;
+    const idx = p.indices !== undefined ? read(p.indices, Uint32Array) : null, cnt = Math.floor((idx ? idx.length : pos.length / 3) / 3);
+    for (let t = 0; t < cnt; t++, w++) { M[w] = p.material !== undefined ? p.material : nm;
+      for (let c = 0; c < 3; c++) { const v = idx ? idx[t * 3 + c] : t * 3 + c, x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
+        T[w * 9 + c * 3] = Wm[0] * x + Wm[4] * y + Wm[8] * z + Wm[12]; T[w * 9 + c * 3 + 1] = Wm[1] * x + Wm[5] * y + Wm[9] * z + Wm[13];
+        T[w * 9 + c * 3 + 2] = Wm[2] * x + Wm[6] * y + Wm[10] * z + Wm[14];
+        if (uv) { UV[w * 6 + c * 2] = uv[v * 2]; UV[w * 6 + c * 2 + 1] = uv[v * 2 + 1]; } } }
+  }
+  const cache = new Map();
+  const texture = async info => { if (!info) return null; const tx = (json.textures || [])[info.index]; if (!tx || tx.source === undefined) return null;
+    if (cache.has(tx.source)) return cache.get(tx.source);
+    const im = json.images[tx.source]; let res = null;
+    if (im && im.bufferView !== undefined) try { const bv = json.bufferViews[im.bufferView];
+      const bmp = await createImageBitmap(new Blob([new Uint8Array(buf, bin + (bv.byteOffset || 0), bv.byteLength)], { type: im.mimeType || 'image/png' }));
+      const s = Math.min(1, 512 / Math.max(bmp.width, bmp.height)), cw = Math.max(1, Math.round(bmp.width * s)), ch = Math.max(1, Math.round(bmp.height * s));
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(bmp, 0, 0, cw, ch); res = { w: cw, h: ch, data: x.getImageData(0, 0, cw, ch).data };
+    } catch (e) { res = null; }
+    cache.set(tx.source, res); return res; };
+  const mats = [];
+  for (const m of json.materials || []) { const pb = m.pbrMetallicRoughness || {}, sg = (m.extensions || {}).KHR_materials_pbrSpecularGlossiness || {};
+    const f = pb.baseColorFactor || sg.diffuseFactor || [1, 1, 1, 1];
+    mats.push({ rgb: [0, 1, 2].map(i => Math.pow(Math.min(1, Math.max(0, f[i])), 1 / 2.2)), tex: await texture(pb.baseColorTexture || sg.diffuseTexture), name: m.name || '' }); }
+  mats.push({ rgb: [.8, .8, .82], tex: null, name: '' });
+  return { T, UV, M, mats };
+}
+
+// ================================================================ TRIANGLES -> POINTS
+function sampleTriangles(mesh, n, r) {
+  const T = mesh.T, m = Math.floor(T.length / 9), cum = new Float64Array(m), FN = new Float32Array(m * 3); let acc = 0;
+  for (let i = 0; i < m; i++) {
+    const o = i * 9, ax = T[o + 3] - T[o], ay = T[o + 4] - T[o + 1], az = T[o + 5] - T[o + 2],
+          bx = T[o + 6] - T[o], by = T[o + 7] - T[o + 1], bz = T[o + 8] - T[o + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, l = Math.hypot(nx, ny, nz);
+    if (isFinite(l)) acc += l / 2;
+    cum[i] = acc; if (l > 0 && isFinite(l)) { FN[i * 3] = nx / l; FN[i * 3 + 1] = ny / l; FN[i * 3 + 2] = nz / l; }
+  }
+  if (!(acc > 0)) throw new Error('No usable triangles found in that file.');
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), mats = mesh.mats, UV = mesh.UV;
+  const tint = mats ? new Float32Array(n * 3) : null, mid = mats ? new Uint16Array(n) : null;
+  for (let k = 0; k < n; k++) {
+    const x = r() * acc; let lo = 0, hi = m - 1;
+    while (lo < hi) { const md = lo + hi >> 1; if (cum[md] < x) lo = md + 1; else hi = md; }
+    let a = r(), b = r(); if (a + b > 1) { a = 1 - a; b = 1 - b; }
+    const o = lo * 9;
+    for (let c = 0; c < 3; c++) { P[k * 3 + c] = T[o + c] + a * (T[o + 3 + c] - T[o + c]) + b * (T[o + 6 + c] - T[o + c]); N[k * 3 + c] = FN[lo * 3 + c]; }
+    if (mats) { const mi = Math.min(mesh.M[lo], mats.length - 1), mt = mats[mi]; let cr = mt.rgb[0], cg = mt.rgb[1], cb = mt.rgb[2];
+      if (mt.tex && UV) { const q = lo * 6, u = UV[q] + a * (UV[q + 2] - UV[q]) + b * (UV[q + 4] - UV[q]), v = UV[q + 1] + a * (UV[q + 3] - UV[q + 1]) + b * (UV[q + 5] - UV[q + 1]);
+        const tx = Math.min(mt.tex.w - 1, Math.floor((u - Math.floor(u)) * mt.tex.w)), ty = Math.min(mt.tex.h - 1, Math.floor((v - Math.floor(v)) * mt.tex.h)), j = (ty * mt.tex.w + tx) * 4;
+        cr *= mt.tex.data[j] / 255; cg *= mt.tex.data[j + 1] / 255; cb *= mt.tex.data[j + 2] / 255; }
+      tint[k * 3] = cr; tint[k * 3 + 1] = cg; tint[k * 3 + 2] = cb; mid[k] = mi; }
+  }
+  return { P, N, n, tint, mid, mats };
+}
+// Throw away points nobody can ever see (seats, engine, the inside of a hollow print) so the outside gets all the detail.
+function outerShell(c, keep, r) {
+  const n = c.n, P = c.P, G = 150, vis = new Uint8Array(n), zb = new Float32Array(G * G), cell = new Int32Array(n), dep = new Float32Array(n);
+  let cx = 0, cy = 0, cz = 0; for (let k = 0; k < n; k++) { cx += P[k * 3]; cy += P[k * 3 + 1]; cz += P[k * 3 + 2]; } cx /= n; cy /= n; cz /= n;
+  let R = 0; for (let k = 0; k < n; k++) R = Math.max(R, Math.hypot(P[k * 3] - cx, P[k * 3 + 1] - cy, P[k * 3 + 2] - cz)); R = R || 1;
+  const eps = R * 2 / G * 1.6;
+  for (let d = 0; d < 70; d++) {
+    const y = 1 - 2 * (d + .5) / 70, rad = Math.sqrt(1 - y * y), ph = d * 2.39996, fx = Math.cos(ph) * rad, fy = y, fz = Math.sin(ph) * rad;   // view direction
+    let ux = -fz, uy = 0, uz = fx; const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul; if (ul < 1e-6) { ux = 1; uz = 0; }
+    const vx = fy * uz - fz * uy, vy = fz * ux - fx * uz, vz = fx * uy - fy * ux;
+    zb.fill(1e30);
+    for (let k = 0; k < n; k++) { const x = P[k * 3] - cx, yy = P[k * 3 + 1] - cy, z = P[k * 3 + 2] - cz;
+      const gx = Math.min(G - 1, Math.max(0, Math.floor((x * ux + yy * uy + z * uz) / R * G / 2 + G / 2))), gy = Math.min(G - 1, Math.max(0, Math.floor((x * vx + yy * vy + z * vz) / R * G / 2 + G / 2)));
+      const i = gy * G + gx, dz = x * fx + yy * fy + z * fz; cell[k] = i; dep[k] = dz; if (dz < zb[i]) zb[i] = dz; }
+    for (let k = 0; k < n; k++) if (dep[k] <= zb[cell[k]] + eps) vis[k] = 1;
+  }
+  let cnt = 0; for (let k = 0; k < n; k++) cnt += vis[k];
+  const m = Math.min(keep, cnt), o = { P: new Float32Array(m * 3), N: new Float32Array(m * 3), n: m, tint: c.tint ? new Float32Array(m * 3) : null, mid: c.mid ? new Uint16Array(m) : null, mats: c.mats };
+  for (let k = 0, w = 0; k < n && w < m; k++) if (vis[k]) { o.P.set(P.subarray(k * 3, k * 3 + 3), w * 3); o.N.set(c.N.subarray(k * 3, k * 3 + 3), w * 3);
+    if (o.tint) o.tint.set(c.tint.subarray(k * 3, k * 3 + 3), w * 3); if (o.mid) o.mid[w] = c.mid[k]; w++; }
+  return o;
+}
+// Find the edges of an uploaded model: places where the surface folds sharply or simply stops (window frames, wheel arches).
+function findCreases(T, c, r) {
+  const m = Math.floor(T.length / 9); if (m > 1600000) return null;
+  const lo = [1e30, 1e30, 1e30], hi = [-1e30, -1e30, -1e30];
+  for (let i = 0; i < m * 9; i++) { const v = T[i], a = i % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+  const span = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1, q = 4095 / span, vid = new Map(), VI = new Uint32Array(m * 3), FN = new Float32Array(m * 3); let nv = 0;
+  for (let i = 0; i < m * 3; i++) { const key = (Math.round((T[i * 3] - lo[0]) * q) * 4096 + Math.round((T[i * 3 + 1] - lo[1]) * q)) * 4096 + Math.round((T[i * 3 + 2] - lo[2]) * q);   // weld matching corners
+    let id = vid.get(key); if (id === undefined) { id = nv++; vid.set(key, id); } VI[i] = id; }
+  for (let f = 0; f < m; f++) { const o = f * 9, ax = T[o + 3] - T[o], ay = T[o + 4] - T[o + 1], az = T[o + 5] - T[o + 2], bx = T[o + 6] - T[o], by = T[o + 7] - T[o + 1], bz = T[o + 8] - T[o + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, l = Math.hypot(nx, ny, nz); if (l > 0 && isFinite(l)) { FN[f * 3] = nx / l; FN[f * 3 + 1] = ny / l; FN[f * 3 + 2] = nz / l; } }
+  const em = new Map(), out = [], add = (f, e, nx, ny, nz) => { const a = f * 9 + e * 3, b = f * 9 + ((e + 1) % 3) * 3; out.push(T[a], T[a + 1], T[a + 2], T[b], T[b + 1], T[b + 2], nx, ny, nz); };
+  for (let f = 0; f < m; f++) for (let e = 0; e < 3; e++) { const a = VI[f * 3 + e], b = VI[f * 3 + (e + 1) % 3]; if (a === b) continue;
+    const key = a < b ? a * nv + b : b * nv + a, prev = em.get(key);
+    if (prev === undefined) em.set(key, f * 3 + e + 1);
+    else if (prev > 0) { const g = Math.floor((prev - 1) / 3); em.set(key, 0);
+      if (FN[f * 3] * FN[g * 3] + FN[f * 3 + 1] * FN[g * 3 + 1] + FN[f * 3 + 2] * FN[g * 3 + 2] < 0.72) add(f, e, FN[f * 3] + FN[g * 3], FN[f * 3 + 1] + FN[g * 3 + 1], FN[f * 3 + 2] + FN[g * 3 + 2]); } }   // a sharp fold
+  for (const v of em.values()) if (v > 0) { const f = Math.floor((v - 1) / 3); add(f, (v - 1) % 3, FN[f * 3], FN[f * 3 + 1], FN[f * 3 + 2]); }                                                        // an open edge
+  // keep only edges on the visible shell, pointing outward
+  const G = 56, occ = new Uint8Array(G * G * G), sl = [1e30, 1e30, 1e30], sh = [-1e30, -1e30, -1e30];
+  for (let i = 0; i < c.n * 3; i++) { const v = c.P[i], a = i % 3; if (v < sl[a]) sl[a] = v; if (v > sh[a]) sh[a] = v; }
+  const vox = (x, y, z) => { const gx = Math.floor((x - sl[0]) / (sh[0] - sl[0] + 1e-9) * G), gy = Math.floor((y - sl[1]) / (sh[1] - sl[1] + 1e-9) * G), gz = Math.floor((z - sl[2]) / (sh[2] - sl[2] + 1e-9) * G);
+    return gx < 0 || gy < 0 || gz < 0 || gx >= G || gy >= G || gz >= G ? -1 : (gx * G + gy) * G + gz; };
+  for (let k = 0; k < c.n; k++) { const v = vox(c.P[k * 3], c.P[k * 3 + 1], c.P[k * 3 + 2]); if (v >= 0) occ[v] = 1; }
+  const ctr = [(sl[0] + sh[0]) / 2, (sl[1] + sh[1]) / 2, (sl[2] + sh[2]) / 2], keep = [], cum = []; let total = 0;
+  for (let k = 0; k < out.length; k += 9) { const mx = (out[k] + out[k + 3]) / 2, my = (out[k + 1] + out[k + 4]) / 2, mz = (out[k + 2] + out[k + 5]) / 2, v = vox(mx, my, mz); if (v < 0 || !occ[v]) continue;
+    if (out[k + 6] * (mx - ctr[0]) + out[k + 7] * (my - ctr[1]) + out[k + 8] * (mz - ctr[2]) < 0) { out[k + 6] = -out[k + 6]; out[k + 7] = -out[k + 7]; out[k + 8] = -out[k + 8]; }
+    total += Math.hypot(out[k + 3] - out[k], out[k + 4] - out[k + 1], out[k + 5] - out[k + 2]); keep.push(k); cum.push(total); }
+  const size = Math.max(sh[0] - sl[0], sh[1] - sl[1], sh[2] - sl[2]); if (keep.length < 40 || total < size * 4) return null;     // a smooth blob: nothing to follow
+  const MAXS = 30000, pick = keep.length <= MAXS ? keep : (() => { const set = new Set(); for (let i = 0; i < MAXS; i++) { const x = (i + r()) / MAXS * total; let a = 0, b = cum.length - 1; while (a < b) { const md = a + b >> 1; if (cum[md] < x) a = md + 1; else b = md; } set.add(keep[a]); } return [...set]; })();
+  const segs = new Float32Array(pick.length * 9); pick.forEach((k, i) => { for (let j = 0; j < 9; j++) segs[i * 9 + j] = out[k + j]; });
+  return segs;
+}
+function pickPaintable(c) {                  // which material is "the body"? one named like paint, else the biggest
+  if (!c.mid) return null;
+  const cnt = new Float64Array(c.mats.length); for (let k = 0; k < c.n; k++) cnt[c.mid[k]]++;
+  let best = -1; c.mats.forEach((m, i) => { if (cnt[i] > c.n * 0.04 && /paint|body|carros|exterior|karosser/i.test(m.name) && (best < 0 || cnt[i] > cnt[best])) best = i; });
+  if (best < 0) best = cnt.indexOf(Math.max(...cnt));
+  const mask = new Uint8Array(c.n); for (let k = 0; k < c.n; k++) mask[k] = c.mid[k] === best ? 1 : 0;
+  return mask;
+}
+
+// ================================================================ BUILT-IN MODELS (all original, generated by code)
+function builder() { return { P: [], N: [], C: [], paint: [], wheel: [], lamps: [], segs: [] }; }   // segs: edges where lights can hang (x1,y1,z1, x2,y2,z2, nx,ny,nz)
+function put(B, x, y, z, nx, ny, nz, col, paint, wheel) { const l = Math.hypot(nx, ny, nz) || 1;
+  B.P.push(x, y, z); B.N.push(nx / l, ny / l, nz / l); B.C.push(col[0], col[1], col[2]); B.paint.push(paint | 0); B.wheel.push(wheel || 0); }
+function finish(B, r, extra) {               // shuffle so that any prefix of the points covers the whole model evenly
+  const n = B.paint.length, idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)), t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+  const o = { P: new Float32Array(n * 3), N: new Float32Array(n * 3), tint: new Float32Array(n * 3), paint: new Uint8Array(n), wheel: new Uint8Array(n), n, lamps: B.lamps, segs: new Float32Array(B.segs) };
+  for (let i = 0; i < n; i++) { const k = idx[i]; for (let c = 0; c < 3; c++) { o.P[i * 3 + c] = B.P[k * 3 + c]; o.N[i * 3 + c] = B.N[k * 3 + c]; o.tint[i * 3 + c] = B.C[k * 3 + c]; }
+    o.paint[i] = B.paint[k]; o.wheel[i] = B.wheel[k]; }
+  return Object.assign(o, extra || {});
+}
+function latheEach(profile, n, r, cb) {       // spin an outline [(radius, y), ...] around the vertical axis
+  const segs = profile.length - 1, w = new Float64Array(segs); let acc = 0;
+  for (let i = 0; i < segs; i++) { const [r0, y0] = profile[i], [r1, y1] = profile[i + 1]; acc += Math.hypot(r1 - r0, y1 - y0) * (r0 + r1) / 2 + 1e-9; w[i] = acc; }
+  for (let k = 0; k < n; k++) { const x = r() * acc; let i = 0; while (w[i] < x) i++;
+    const [r0, y0] = profile[i], [r1, y1] = profile[i + 1], f = r(), th = r() * TAU, rr = r0 + (r1 - r0) * f, nr = y1 - y0, ny = -(r1 - r0);
+    cb(rr * Math.cos(th), y0 + (y1 - y0) * f, rr * Math.sin(th), nr * Math.cos(th), ny, nr * Math.sin(th)); }
+}
+function sphereEach(n, cx, cy, cz, rad, r, cb) { for (let k = 0; k < n; k++) { const a = r() * TAU, y = 2 * r() - 1, q = Math.sqrt(1 - y * y), x = q * Math.cos(a), z = q * Math.sin(a);
+  cb(cx + x * rad, cy + y * rad, cz + z * rad, x, y, z); } }
+function pineProfile(h, rad, tiers) { const y0 = 0.12 * h, prof = [[0.07 * h / 2.3, 0], [0.07 * h / 2.3, y0]];
+  for (let k = 0; k < tiers; k++) { const f0 = k / tiers, f1 = (k + 1) / tiers;
+    prof.push([rad * Math.pow(1 - f0, .9) + .03, y0 + f0 * (h - y0)], [rad * Math.pow(1 - f1, .9) * .45, y0 + f1 * (h - y0)]); }
+  prof.push([0, h]); return prof; }
+function makeTree(n, r) { const B = builder(), h = 2.3;
+  latheEach(pineProfile(h, .95, 8), n, r, (x, y, z, nx, ny, nz) => { const g = r(), trunk = y < 0.12 * h - 1e-6;
+    put(B, x, y, z, nx, ny, nz, trunk ? [.40, .26, .14] : [.10 + .12 * g, .50 + .40 * g, .12 + .12 * r()], !trunk); });
+  return finish(B, r);
+}
+function makeRocket(n, r) { const B = builder(), W = [.9, .92, .96], RD = [.9, .12, .12];
+  latheEach([[.17, 0], [.28, .22], [.28, 1.62], [.2, 2.0], [0, 2.4]], Math.floor(n * .74), r, (x, y, z, nx, ny, nz) =>
+    put(B, x, y, z, nx, ny, nz, y > 1.62 ? RD : (y > 1.2 && y < 1.3) ? [.15, .2, .35] : W, y <= 1.62 && !(y > 1.2 && y < 1.3)));
+  for (let k = 0; k < n * .26; k++) { const th = Math.floor(r() * 4) * TAU / 4, side = r() < .5 ? 1 : -1; let u = r(), v = r(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+    const rr = .28 + .5 * u; put(B, rr * Math.cos(th), .02 + .85 * v, rr * Math.sin(th), -Math.sin(th) * side, 0, Math.cos(th) * side, RD, 0); }
+  return finish(B, r);
+}
+function makeSnowman(n, r) { const B = builder(), W = [.92, .95, 1], K = [.2, .2, .25], balls = [[.58, .62], [1.42, .45], [2.02, .32]];
+  balls.forEach(([cy, rad], i) => sphereEach(Math.floor(n * [.42, .24, .13][i]), 0, cy, 0, rad, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, W, 1)));
+  latheEach([[.44, 2.25], [.44, 2.29], [.25, 2.29], [.25, 2.62], [0, 2.62]], Math.floor(n * .08), r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, K, 0));
+  for (let k = 0; k < n * .02; k++) { const t = 1 - Math.sqrt(r()), a = r() * TAU, q = (1 - t) * .06;                                    // carrot nose
+    put(B, .30 + t * .34, 2.02 + q * Math.cos(a), q * Math.sin(a), .2, Math.cos(a), Math.sin(a), [1, .5, .1], 0); }
+  const dot = (cy, rad, el, az, s) => { const dx = Math.cos(el) * Math.cos(az), dy = Math.sin(el), dz = Math.cos(el) * Math.sin(az);
+    sphereEach(Math.floor(n * .006), dx * rad, cy + dy * rad, dz * rad, s, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, K, 0)); };
+  dot(2.02, .32, .32, .38, .04); dot(2.02, .32, .32, -.38, .04); for (const el of [-.35, 0, .35]) dot(1.42, .45, el, 0, .045);
+  for (let k = 0; k < n * .05; k++) { const a = r() * TAU, b = r() * TAU, R = .34, q = .075;                                             // scarf
+    put(B, (R + q * Math.cos(b)) * Math.cos(a), 1.76 + q * Math.sin(b), (R + q * Math.cos(b)) * Math.sin(a), Math.cos(b) * Math.cos(a), Math.sin(b), Math.cos(b) * Math.sin(a), [.85, .12, .12], 0); }
+  for (const s of [-1, 1]) for (let k = 0; k < n * .012; k++) { const t = r(), a = r() * TAU;                                            // stick arms
+    put(B, .05 * t + .025 * Math.cos(a), 1.5 + .42 * t + .025 * Math.sin(a), s * (.4 + .62 * t), Math.cos(a), Math.sin(a), 0, [.5, .33, .2], 0); }
+  return finish(B, r);
+}
+// A body described by cross-sections along its length: rows are (x, half width, bottom y, top y, squareness)
+function loft(st, smooth) {
+  const K = 240, x0 = st[0][0], x1 = st[st.length - 1][0], cols = [1, 2, 3, 4].map(j => { const a = new Float64Array(K);
+    for (let k = 0; k < K; k++) { const x = x0 + (x1 - x0) * k / (K - 1); let i = 0; while (i < st.length - 2 && st[i + 1][0] < x) i++;
+      const f = Math.min(1, Math.max(0, (x - st[i][0]) / (st[i + 1][0] - st[i][0]))); a[k] = st[i][j] + (st[i + 1][j] - st[i][j]) * f; }
+    const b = new Float64Array(K), h = smooth >> 1; for (let k = 0; k < K; k++) { let s = 0; for (let d = -h; d <= h; d++) s += a[Math.min(K - 1, Math.max(0, k + d))]; b[k] = s / (2 * h + 1); }
+    return b; });
+  const g = (a, x) => { const f = Math.min(K - 1.0001, Math.max(0, (x - x0) / (x1 - x0) * (K - 1))), i = Math.floor(f); return a[i] + (a[i + 1] - a[i]) * (f - i); };
+  const L = { x0, x1, top: x => g(cols[2], x), mid: x => (g(cols[1], x) + g(cols[2], x)) / 2,
+    at(x, th, o) { const w = g(cols[0], x), yb = g(cols[1], x), yt = g(cols[2], x), e = g(cols[3], x), c = Math.cos(th), s = Math.sin(th);
+      o[0] = x; o[1] = (yt + yb) / 2 + (yt - yb) / 2 * Math.sign(s) * Math.pow(Math.abs(s), 2 / e); o[2] = w * Math.sign(c) * Math.pow(Math.abs(c), 2 / e); } };
+  return L;
+}
+function loftEach(L, n, r, caps, cb) {
+  const m = n * 5, X = new Float32Array(m), PP = new Float32Array(m * 3), NN = new Float32Array(m * 3), cum = new Float64Array(m), a = [0, 0, 0], b = [0, 0, 0], c = [0, 0, 0], e = 1e-3; let acc = 0;
+  for (let i = 0; i < m; i++) { const x = L.x0 + r() * (L.x1 - L.x0 - 2 * e), th = r() * TAU; L.at(x, th, a); L.at(x + e, th, b); L.at(x, th + e, c);
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; if (ny * (a[1] - L.mid(x)) + nz * a[2] < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    acc += Math.hypot(nx, ny, nz); cum[i] = acc; X[i] = x; PP.set(a, i * 3); NN[i * 3] = nx; NN[i * 3 + 1] = ny; NN[i * 3 + 2] = nz; }
+  for (let k = 0; k < n; k++) { const x = r() * acc; let lo = 0, hi = m - 1; while (lo < hi) { const md = lo + hi >> 1; if (cum[md] < x) lo = md + 1; else hi = md; }
+    cb(PP[lo * 3], PP[lo * 3 + 1], PP[lo * 3 + 2], NN[lo * 3], NN[lo * 3 + 1], NN[lo * 3 + 2]); }
+  if (caps) for (const [xe, sg] of [[L.x0, -1], [L.x1 - 2 * e, 1]]) for (let k = 0; k < n / 25; k++) { L.at(xe, r() * TAU, a); const q = Math.sqrt(r()), my = L.mid(xe);
+    cb(xe, my + (a[1] - my) * q, a[2] * q, sg, 0, 0); }
+}
+function makeCar(spec, n, r) {
+  const B = builder(), body = loft(spec.body, 7), cabin = loft(spec.cabin, 5), { wr, wx, wz } = spec;
+  const PAINT = [.85, .1, .12], SILL = [.2, .2, .23], GLASS = [.13, .2, .33], TYRE = [.2, .2, .22], RIM = [.8, .82, .86], HUB = [.3, .3, .34];
+  loftEach(body, Math.floor(n * .46), r, true, (x, y, z, nx, ny, nz) => {
+    for (const sx of [-wx, wx]) if ((x - sx) ** 2 + (y - wr) ** 2 < (wr + .07) ** 2 && Math.abs(z) > wz - .35) return;          // wheel arches
+    const low = y < spec.sill; put(B, x, y, z, nx, ny, nz, low ? SILL : PAINT, !low); });
+  loftEach(cabin, Math.floor(n * .22), r, false, (x, y, z, nx, ny, nz) => { if (y < body.top(x) - .02) return;
+    const metal = (y > cabin.top(x) - .05 && x > spec.roof[0] && x < spec.roof[1]) || spec.pillars.some(p => Math.abs(x - p) < .05);
+    put(B, x, y, z, nx, ny, nz, metal ? PAINT : GLASS, metal); });
+  let id = 0; const wn = Math.floor(n * .08), wd = spec.wwidth;
+  for (const sx of [1, -1]) for (const sz of [1, -1]) { id++; const cx = sx * wx, cz = sz * wz;
+    for (let k = 0; k < wn / 2; k++) { const a = r() * TAU; put(B, cx + wr * Math.cos(a), wr + wr * Math.sin(a), cz + (r() - .5) * wd, Math.cos(a), Math.sin(a), 0, TYRE, 0, id); }
+    for (const s of [-1, 1]) for (let k = 0; k < wn / 4; k++) { const a = r() * TAU, rr = wr * Math.sqrt(r());
+      const spoke = Math.abs(((a * 5 / TAU) % 1) - .5) < .16 || rr < .28 * wr, tyre = rr > .68 * wr;
+      put(B, cx + rr * Math.cos(a), wr + rr * Math.sin(a), cz + s * wd / 2, 0, 0, s, tyre ? TYRE : spoke ? RIM : HUB, 0, id); } }
+  for (const [x, y, z] of spec.head) for (const s of [-1, 1]) B.lamps.push([x, y, z * s, 1, .97, .85]);
+  for (const [x, y, z] of spec.tail) for (const s of [-1, 1]) B.lamps.push([x, y, z * s, 1, .08, .05]);
+  // where the lights go: along the shoulders, sills, roof edges, around the nose and tail, over the wheel arches
+  const along = (L, pt) => { let prev = null; for (const [x, deg] of pt) { const q = [0, 0, 0]; L.at(x, deg * Math.PI / 180, q); const my = L.mid(x), l = Math.hypot(q[1] - my, q[2]) || 1;
+    if (prev) B.segs.push(prev[0], prev[1], prev[2], q[0], q[1], q[2], 0, (q[1] - my) / l, q[2] / l); prev = q; } };
+  const line = (L, deg, x0, x1, m) => along(L, Array.from({ length: m + 1 }, (_, i) => [x0 + (x1 - x0) * i / m, deg]));
+  const hoop = (L, x) => along(L, Array.from({ length: 15 }, (_, i) => [x, 6 + 168 * i / 14]));
+  for (const a of [38, 142]) line(body, a, body.x0 + .12, body.x1 - .12, 40);
+  for (const a of [-26, 206]) line(body, a, -wx + wr + .14, wx - wr - .14, 14);
+  for (const a of [56, 124]) line(cabin, a, cabin.x0 + .12, cabin.x1 - .12, 22);
+  hoop(body, body.x1 - .2); hoop(body, body.x0 + .2);
+  for (const sx of [1, -1]) for (const sz of [1, -1]) { let prev = null; for (let i = 0; i <= 10; i++) { const a = .25 + (Math.PI - .5) * i / 10, q = [sx * wx + (wr + .1) * Math.cos(a), wr + (wr + .1) * Math.sin(a), sz * (wz + .13)];
+    if (prev) B.segs.push(prev[0], prev[1], prev[2], q[0], q[1], q[2], 0, 0, sz); prev = q; } }
+  return finish(B, r, { fwd: [1, 0, 0] });
+}
+function boxEach(n, cx, cy, cz, sx, sy, sz, r, cb) { const A = [sy * sz, sy * sz, sx * sz, sx * sz, sx * sy, sx * sy], tot = 2 * (sy * sz + sx * sz + sx * sy), S3 = [sx, sy, sz];
+  for (let k = 0; k < n; k++) { let q = r() * tot, f = 0; while (f < 5 && q > A[f]) { q -= A[f]; f++; }
+    const ax = f >> 1, sg = f & 1 ? -1 : 1, p = [r() - .5, r() - .5, r() - .5], nn = [0, 0, 0]; p[ax] = sg * .5; nn[ax] = sg;
+    cb(cx + p[0] * S3[0], cy + p[1] * S3[1], cz + p[2] * S3[2], nn[0], nn[1], nn[2]); } }
+function makeGift(n, r) { const B = builder(), RED = [.8, .1, .15], GOLD = [1, .82, .3];
+  const wrapIt = (x, y, z, nx, ny, nz) => { const rib = Math.abs(x) < .14 || Math.abs(z) < .14; put(B, x, y, z, nx, ny, nz, rib ? GOLD : RED, !rib); };
+  boxEach(Math.floor(n * .58), 0, .6, 0, 1.7, 1.2, 1.7, r, wrapIt); boxEach(Math.floor(n * .24), 0, 1.33, 0, 1.86, .28, 1.86, r, wrapIt);
+  for (const s of [-1, 1]) for (let k = 0; k < n * .07; k++) { const a = r() * TAU, b = r() * TAU, R = .3, q = .075, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b);      // bow loops
+    put(B, s * (.34 + (R + q * cb) * ca * .9), 1.66 + (R + q * cb) * sa * .6, q * Math.sin(b) * 1.6, s * cb * ca, cb * sa, Math.sin(b), GOLD, 0); }
+  sphereEach(Math.floor(n * .04), 0, 1.56, 0, .13, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, GOLD, 0));
+  for (const [cy, sx, sy] of [[.6, 1.7, 1.2], [1.33, 1.86, .28]]) for (const a of [-1, 1]) for (const b of [-1, 1]) { const h = sx / 2, y0 = cy - sy / 2, y1 = cy + sy / 2;
+    B.segs.push(a * h, y0, b * h, a * h, y1, b * h, a, 0, b);                                              // upright corners
+    B.segs.push(-h, a > 0 ? y1 : y0, b * h, h, a > 0 ? y1 : y0, b * h, 0, a, b); B.segs.push(b * h, a > 0 ? y1 : y0, -h, b * h, a > 0 ? y1 : y0, h, b, a, 0); }
+  return finish(B, r);
+}
+function makeText(str, n, r) {               // any word, as fat 3D letters (long phrases stack into lines)
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true }), fs = 150, font = '900 ' + fs + 'px "Arial Black", Impact, "Helvetica Neue", Arial, sans-serif';
+  const words = str.length > 7 && /\s/.test(str) ? str.split(/\s+/).slice(0, 3) : [str], gap = fs * 0.09, lineH = fs * 0.98, TALL = 1.35;
+  x.font = font; const cw = words.map(w => [...w].map(ch => x.measureText(ch).width)), lw = cw.map(a => a.reduce((p, q) => p + q + gap, 0));
+  c.width = Math.min(4096, Math.ceil(Math.max(...lw)) + 24); c.height = Math.round(lineH * words.length + fs * 0.5);
+  x.font = font; x.textBaseline = 'middle'; x.fillStyle = '#fff';
+  words.forEach((w, li) => { let pen = (c.width - lw[li]) / 2; [...w].forEach((ch, i) => { x.fillText(ch, pen, fs * 0.25 + lineH * (li + 0.5)); pen += cw[li][i] + gap; }); });
+  const Wc = c.width, Hc = c.height, d = x.getImageData(0, 0, Wc, Hc).data, ins = (px, py) => px >= 0 && py >= 0 && px < Wc && py < Hc && d[(py * Wc + px) * 4 + 3] > 127;
+  const face = [], edge = [];
+  for (let py = 0; py < Hc; py++) for (let px = 0; px < Wc; px++) if (ins(px, py)) { face.push(px, py);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!ins(px + dx, py + dy)) edge.push(px, py, dx, dy); }
+  if (!face.length) throw new Error('Type at least one letter or number.');
+  const D = fs * 0.3, nf = face.length / 2, ne = edge.length / 4, cntF = Math.round(n * 2 * nf * TALL / (2 * nf * TALL + ne * D)), B = builder(), col = [.85, .1, .12];
+  for (let k = 0; k < cntF; k++) { const i = Math.floor(r() * nf), sg = r() < .5 ? 1 : -1; put(B, face[i * 2] + r(), (Hc - face[i * 2 + 1] - r()) * TALL, sg * D / 2, 0, 0, sg, col, 1); }
+  for (let k = cntF; k < n; k++) { const i = Math.floor(r() * ne) * 4, px = edge[i], py = edge[i + 1], dx = edge[i + 2], dy = edge[i + 3];
+    put(B, dx ? px + (dx > 0 ? 1 : 0) : px + r(), (Hc - (dy ? py + (dy > 0 ? 1 : 0) : py + r())) * TALL, (r() - .5) * D, dx, -dy, 0, col, 2); }   // 2 = painted, but darker: the sides of the letters
+  for (let i = 0; i < edge.length; i += 4) { const px = edge[i], py = edge[i + 1], dx = edge[i + 2], dy = edge[i + 3], X = px + (dx > 0 ? 1 : 0), Y = py + (dy > 0 ? 1 : 0);   // the outline of every letter
+    if (dx) B.segs.push(X, (Hc - py) * TALL, D / 2, X, (Hc - py - 1) * TALL, D / 2, dx * .4, 0, 1); else B.segs.push(px, (Hc - Y) * TALL, D / 2, px + 1, (Hc - Y) * TALL, D / 2, 0, -dy * .4, 1); }
+  return finish(B, r, { sway: true });
+}
+const COUPE = { wr: .36, wx: 1.36, wz: .80, wwidth: .26, sill: .30, roof: [-1.0, .35], pillars: [-.35], head: [[2.17, .47, .55]], tail: [[-2.21, .60, .48]],
+  body: [[-2.20, .62, .40, .66, 3.0], [-2.05, .86, .28, .80, 3.5], [-1.50, .93, .21, .85, 3.8], [-.70, .95, .19, .80, 4.0], [.10, .95, .19, .76, 4.0], [.90, .94, .19, .71, 3.6], [1.55, .90, .21, .62, 3.2], [2.00, .82, .25, .51, 2.8], [2.20, .60, .31, .44, 2.5]],
+  cabin: [[-1.80, .58, .70, .82, 3], [-1.20, .72, .70, .99, 3], [-.50, .77, .70, 1.15, 3], [-.05, .77, .70, 1.18, 3], [.40, .75, .68, 1.04, 3], [.85, .70, .66, .76, 3], [1.02, .60, .64, .69, 3]] };
+const CROSSOVER = { wr: .42, wx: 1.40, wz: .86, wwidth: .30, sill: .44, roof: [-1.55, .40], pillars: [-.50, -1.45], head: [[2.20, .78, .60]], tail: [[-2.25, .92, .60]],
+  body: [[-2.25, .70, .58, .98, 3.0], [-2.10, .92, .40, 1.10, 3.6], [-1.50, .98, .32, 1.13, 4.0], [-.60, .99, .30, 1.11, 4.0], [.30, .99, .30, 1.07, 4.0], [1.10, .98, .30, 1.01, 3.8], [1.70, .94, .32, .94, 3.4], [2.08, .87, .36, .84, 3.0], [2.24, .68, .44, .72, 2.6]],
+  cabin: [[-2.14, .68, 1.0, 1.22, 3.0], [-1.80, .80, 1.0, 1.52, 3.2], [-1.00, .84, 1.0, 1.66, 3.2], [-.10, .84, .98, 1.68, 3.2], [.50, .82, .96, 1.52, 3.0], [1.00, .76, .94, 1.14, 3.0], [1.28, .66, .92, 1.00, 3.0]] };
+const SEDAN = { wr: .34, wx: 1.38, wz: .80, wwidth: .26, sill: .34, roof: [-.85, .45], pillars: [-.15], head: [[2.27, .66, .56]], tail: [[-2.31, .78, .54]],
+  body: [[-2.30, .66, .46, .84, 3.0], [-2.15, .88, .32, .96, 3.6], [-1.60, .93, .24, 1.00, 4.0], [-.70, .94, .22, .99, 4.0], [.20, .94, .22, .96, 4.0], [1.00, .93, .22, .93, 3.8], [1.65, .90, .24, .86, 3.4], [2.10, .83, .28, .74, 3.0], [2.30, .64, .36, .62, 2.6]],
+  cabin: [[-1.55, .62, .90, 1.00, 3], [-1.10, .76, .90, 1.30, 3], [-.60, .80, .90, 1.42, 3], [.20, .80, .88, 1.43, 3], [.65, .78, .86, 1.30, 3], [1.10, .72, .84, .98, 3], [1.28, .62, .82, .90, 3]] };
+const HATCH = { wr: .33, wx: 1.25, wz: .80, wwidth: .25, sill: .36, roof: [-1.5, .3], pillars: [-.35, -1.35], head: [[1.97, .70, .56]], tail: [[-2.00, .82, .56]],
+  body: [[-2.00, .70, .50, .92, 3.0], [-1.88, .88, .34, 1.02, 3.6], [-1.30, .92, .26, 1.04, 4.0], [-.40, .93, .24, 1.02, 4.0], [.50, .93, .24, .98, 4.0], [1.20, .91, .24, .92, 3.6], [1.70, .86, .28, .80, 3.2], [2.00, .66, .36, .66, 2.6]],
+  cabin: [[-1.93, .66, .92, 1.10, 3.0], [-1.70, .78, .92, 1.40, 3.2], [-1.00, .81, .92, 1.50, 3.2], [-.10, .81, .90, 1.50, 3.2], [.45, .79, .88, 1.34, 3.0], [.95, .72, .86, 1.00, 3.0], [1.12, .62, .84, .92, 3.0]] };
+const PICKUP = { wr: .46, wx: 1.55, wz: .88, wwidth: .32, sill: .56, roof: [-.4, .8], pillars: [.25], head: [[2.46, .86, .66]], tail: [[-2.52, .90, .70]],
+  body: [[-2.50, .84, .62, 1.02, 4.0], [-2.40, .96, .48, 1.06, 4.5], [-1.60, .98, .44, 1.06, 4.5], [-.60, .98, .42, 1.06, 4.5], [.30, .98, .42, 1.10, 4.2], [1.20, .98, .42, 1.12, 4.0], [1.90, .96, .44, 1.08, 3.8], [2.32, .90, .50, .98, 3.4], [2.50, .74, .58, .86, 3.0]],
+  cabin: [[-.62, .70, 1.02, 1.20, 3.5], [-.45, .84, 1.02, 1.66, 3.6], [.10, .86, 1.02, 1.74, 3.6], [.75, .86, 1.02, 1.72, 3.6], [1.15, .82, 1.02, 1.40, 3.2], [1.45, .74, 1.02, 1.16, 3.0]] };
+const car = (label, spec, paint) => ({ label, make: (n, r) => makeCar(spec, n, r), topper: false, repaint: true, paint, mode: 'outline', car: true });
+const PRESETS = {
+  coupe:   car('Sports car', COUPE, '#d41a1f'),
+  sedan:   car('Sedan', SEDAN, '#c2c8d2'),
+  hatch:   car('Hatchback', HATCH, '#f2c21a'),
+  suv:     car('SUV', CROSSOVER, '#2a62d8'),
+  pickup:  car('Pickup', PICKUP, '#e8ecf2'),
+  tree:    { label: 'Tree',    make: (n, r) => makeTree(n, r),    topper: true,  repaint: false, paint: '#1f9d3a', mode: 'spiral' },
+  rocket:  { label: 'Rocket',  make: (n, r) => makeRocket(n, r),  topper: false, repaint: false, paint: '#e6ebf5', mode: 'spiral' },
+  snowman: { label: 'Snowman', make: (n, r) => makeSnowman(n, r), topper: false, repaint: false, paint: '#ebf2ff', mode: 'spiral' },
+  gift:    { label: 'Gift',    make: (n, r) => makeGift(n, r),    topper: false, repaint: true,  paint: '#c8102e', mode: 'outline' },
+};
+
+// ================================================================ STAND IT UP, CENTRE IT, SCALE IT
+function normalize(src, zUp, quarter, flip) {
+  const n = src.n, P = new Float32Array(n * 3), N = new Float32Array(n * 3);
+  const a = quarter * Math.PI / 2, ca = Math.round(Math.cos(a)), sa = Math.round(Math.sin(a));
+  const fix = (A, B, k) => { let x = A[k], y = A[k + 1], z = A[k + 2]; if (zUp) { const t = y; y = z; z = -t; }
+    B[k] = x * ca + z * sa; B[k + 1] = y; B[k + 2] = -x * sa + z * ca; };
+  const lo = [1e30, 1e30, 1e30], hi = [-1e30, -1e30, -1e30];
+  for (let k = 0; k < n * 3; k += 3) { fix(src.P, P, k); fix(src.N, N, k);
+    for (let c = 0; c < 3; c++) { if (P[k + c] < lo[c]) lo[c] = P[k + c]; if (P[k + c] > hi[c]) hi[c] = P[k + c]; } }
+  const s = 2.4 / Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], 1e-9), mv = (p, k) => { p[k] = (p[k] - (lo[0] + hi[0]) / 2) * s; p[k + 1] = (p[k + 1] - lo[1]) * s; p[k + 2] = (p[k + 2] - (lo[2] + hi[2]) / 2) * s; };
+  for (let k = 0; k < n * 3; k += 3) mv(P, k);
+  const size = [(hi[0] - lo[0]) * s, (hi[1] - lo[1]) * s, (hi[2] - lo[2]) * s], cy = size[1] / 2;
+  let inward = 0; for (let k = 0; k < n * 3; k += 3) if (N[k] * P[k] + N[k + 1] * (P[k + 1] - cy) + N[k + 2] * P[k + 2] < 0) inward++;
+  let segs = null; if (src.segs && src.segs.length >= 9) { segs = new Float32Array(src.segs.length);
+    for (let k = 0; k < segs.length; k += 9) { fix(src.segs, segs, k); mv(segs, k); fix(src.segs, segs, k + 3); mv(segs, k + 3); fix(src.segs, segs, k + 6); } }
+  const lamps = (src.lamps || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return [q[0], q[1], q[2], l[3], l[4], l[5]]; });
+  const la = size[0] >= size[2] ? 0 : 2; let fwd = [0, 0, 0]; if (src.fwd) fix(src.fwd, fwd, 0); else fwd[la] = 1;
+  if (flip) { fwd[0] = -fwd[0]; fwd[2] = -fwd[2]; }
+  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, sway: !!src.sway, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
+  if (src.wheel) { d.wheel = src.wheel; const acc = [];
+    for (let k = 0; k < n; k++) { const w = src.wheel[k]; if (!w) continue; const q = acc[w - 1] || (acc[w - 1] = [0, 0, 0, 0, -1e9]);
+      q[0] += P[k * 3]; q[1] += P[k * 3 + 1]; q[2] += P[k * 3 + 2]; q[3]++; if (P[k * 3 + 1] > q[4]) q[4] = P[k * 3 + 1]; }
+    d.wheels = acc.map(q => ({ c: [q[0] / q[3], q[1] / q[3], q[2] / q[3]], r: q[4] - q[1] / q[3] })); }
+  return d;
+}
+
+// ================================================================ LIGHTS
+function buildLights(d, o) {
+  const r = rng(99), pal = PALETTES[o.palette], pts = [], DOTS = 3, JIT = 0.03, lift = 0.035;       // each row: x,y,z, r,g,b, phase, t0, blink
+  const bulb = (x, y, z, col, phase, t0, blink, dots, jit) => { for (let j = 0; j < (dots || DOTS); j++)
+    pts.push(x + gauss(r) * (jit || JIT), y + gauss(r) * (jit || JIT), z + gauss(r) * (jit || JIT), col[0], col[1], col[2], phase, t0, blink); };
+  let count = 0, mode = o.mode; if (mode === 'outline' && !d.segs) mode = 'spiral';
+  if (mode === 'outline') {                  // walk every edge and hang a bulb wherever there is not one already close by
+    const G = d.segs, ns = G.length / 9, half = d.size[d.la] / 2; let total = 0; for (let k = 0; k < G.length; k += 9) total += Math.hypot(G[k + 3] - G[k], G[k + 4] - G[k + 1], G[k + 5] - G[k + 2]);
+    const place = gap => { const grid = new Map(), out = [], key = (a, b, c) => (a + 600) * 1440000 + (b + 600) * 1200 + c + 600, g2 = gap * gap;
+      for (let k = 0; k < G.length; k += 9) { const len = Math.hypot(G[k + 3] - G[k], G[k + 4] - G[k + 1], G[k + 5] - G[k + 2]), st = Math.max(1, Math.ceil(len / (gap * 0.3)));
+        for (let i = 0; i <= st; i++) { const f = i / st, x = G[k] + (G[k + 3] - G[k]) * f, y = G[k + 1] + (G[k + 4] - G[k + 1]) * f, z = G[k + 2] + (G[k + 5] - G[k + 2]) * f;
+          const cx = Math.floor(x / gap), cy = Math.floor(y / gap), cz = Math.floor(z / gap); let ok = true;
+          for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1 && ok; b++) for (let c = -1; c <= 1 && ok; c++) { const cell = grid.get(key(cx + a, cy + b, cz + c)); if (!cell) continue;
+            for (let q = 0; q < cell.length; q += 3) if ((cell[q] - x) ** 2 + (cell[q + 1] - y) ** 2 + (cell[q + 2] - z) ** 2 < g2) { ok = false; break; } }
+          if (!ok) continue; const kk = key(cx, cy, cz), cell = grid.get(kk); if (cell) cell.push(x, y, z); else grid.set(kk, [x, y, z]);
+          const nl = Math.hypot(G[k + 6], G[k + 7], G[k + 8]) || 1; out.push(x + G[k + 6] / nl * lift, y + G[k + 7] / nl * lift, z + G[k + 8] / nl * lift); } }
+      return out; };
+    let gap = Math.max(0.02, total / o.bulbs), out = place(gap);
+    for (let it = 0; it < 5 && Math.abs(out.length / 3 - o.bulbs) > o.bulbs * 0.08; it++) { gap = Math.max(0.015, gap * Math.pow(out.length / 3 / o.bulbs, 0.7)); out = place(gap); }   // tune the spacing until the count is right
+    for (let q = 0; q < out.length; q += 3) { const s = d.sway ? (out[q] + d.size[0] / 2) / d.size[0] : (half - out[q + d.la] * d.fs) / (2 * half);                     // switch on front to back (words: left to right)
+      bulb(out[q], out[q + 1], out[q + 2], pal[count % pal.length], -count * 0.45, o.t0 + o.span * Math.min(1, Math.max(0, s)), o.blink); count++; }
+  }
+  if (mode === 'spiral' || mode === 'both') {
+    const ax = o.axis === 'y' ? 1 : o.axis === 'len' ? d.la : d.size.indexOf(Math.max(...d.size));
+    const u = ax === 0 ? 1 : 0, v = ax === 2 ? 1 : 2, n = o.bulbs, lo = ax === 1 ? 0 : -d.size[ax] / 2, len = d.size[ax], ctr = [0, d.size[1] / 2, 0];
+    const best = new Float32Array(n).fill(-1), bi = new Int32Array(n).fill(-1);
+    for (let k = 0; k < d.n; k++) { const s = (d.P[k * 3 + ax] - lo) / len, ru = d.P[k * 3 + u] - ctr[u], rv = d.P[k * 3 + v] - ctr[v];
+      const f = o.turns * s - Math.atan2(rv, ru) / TAU; if (Math.abs(f - Math.round(f)) > 0.07) continue;       // not near the spiral
+      const b = Math.min(n - 1, Math.max(0, Math.floor(s * n))), rad = ru * ru + rv * rv; if (rad > best[b]) { best[b] = rad; bi[b] = k; } }   // outermost wins
+    for (let b = 0; b < n; b++) { const k = bi[b]; if (k < 0) continue; const p = [d.P[k * 3], d.P[k * 3 + 1], d.P[k * 3 + 2]], rad = Math.sqrt(best[b]) || 1;
+      p[u] += (p[u] - ctr[u]) / rad * lift; p[v] += (p[v] - ctr[v]) / rad * lift;
+      bulb(p[0], p[1], p[2], pal[count % pal.length], -count * 0.45, o.t0 + o.span * b / n, o.blink); count++; }
+  }
+  if (mode === 'scatter' || mode === 'both') { const want = mode === 'both' ? Math.round(o.bulbs / 3) : o.bulbs, cy = d.size[1] / 2;
+    for (let i = 0, tries = 0; i < want && tries < want * 30; tries++) { const k = Math.floor(r() * d.n), x = d.P[k * 3], y = d.P[k * 3 + 1], z = d.P[k * 3 + 2];
+      const nx = d.N[k * 3], ny = d.N[k * 3 + 1], nz = d.N[k * 3 + 2]; if (nx * x + ny * (y - cy) + nz * z < 0.05) continue;       // skip inside faces
+      bulb(x + nx * lift, y + ny * lift, z + nz * lift, pal[Math.floor(r() * pal.length)], r() * 6.28, o.t0 + 0.5 + 1.6 * y, o.blink * (0.5 + r())); i++; count++; } }
+  if (o.topper) for (let j = 0; j < 90; j++) { const a = r() * 6.28, b = Math.acos(2 * r() - 1), q = 0.085 * Math.sqrt(r());
+    pts.push(q * Math.sin(b) * Math.cos(a), d.size[1] + 0.07 + q * Math.cos(b), q * Math.sin(b) * Math.sin(a), 1, .95, .6, 0, o.intro ? 4 * o.u : 0, 0); }
+  for (const l of d.lamps) bulb(l[0], l[1], l[2], [l[3], l[4], l[5]], 0, o.intro ? 4 * o.u * l[1] / d.size[1] : 0, 0, 14, 0.035);                                       // headlights, tail lights
+  return { data: new Float32Array(pts), n: pts.length / 9, bulbs: count, dots: DOTS };
+}
+
+// ================================================================ STATE
+const S = { raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
+let W = 0, H = 0, CW = 6, CH = 12, PW = 1080, PH = 1920, OX = 0, OY = 0;
+let depth, chr, col, emit, halo, img, px32, atlas, ramp, capBmp = null, markBmp = null, panelBase = 1e9, CODE = null;
+const cv = $('cv'), ctx = cv.getContext('2d');
+const R0 = rng(1), snowP = new Float32Array(1500 * 6), starsP = new Float32Array(300 * 6), floorP = [], sprayP = new Float32Array(140 * 5), TREES = [], FOREST = [];
+for (let i = 0; i < 1500; i++) snowP.set([R0() * 9, R0() * 5, R0() * 8, R0() * 6.28, 0.45 * (0.6 + 0.8 * R0()), R0()], i * 6);
+for (let i = 0; i < 300; i++) starsP.set([R0(), Math.pow(R0(), 1.3), 0.25 + 0.75 * Math.pow(R0(), 2.5), R0() * 6.28, 2.2 * (0.4 + R0()), 0.8 + 0.2 * R0()], i * 6);
+for (let z = -9; z < 4.5; z += 0.32) for (let x = -9; x < 9; x += 0.16) floorP.push(x + gauss(R0) * 0.024, z + gauss(R0) * 0.014, 0.6 + 0.4 * R0(), '..::-='.charCodeAt(Math.floor(R0() * 6)));
+for (let i = 0; i < 140; i++) sprayP.set([R0() * 0.55, 2.0 + R0() * 1.2, 0.8 + R0() * 0.9, gauss(R0) * 0.35, i % 2 ? 1 : -1], i * 5);
+for (let v = 0; v < 3; v++) { const n = 3600, P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3); let k = 0;   // roadside pines
+  latheEach(pineProfile(1, .36 + .05 * v, 6), n, R0, (x, y, z, nx, ny, nz) => { const l = Math.hypot(nx, ny, nz) || 1, g = R0(), trunk = y < .12, snowy = !trunk && ny / l > .3 && R0() < .7;
+    P.set([x, y, z], k * 3); N.set([nx / l, ny / l, nz / l], k * 3); C.set(trunk ? [.4, .26, .14] : snowy ? [.9, .94, 1] : [.10 + .1 * g, .42 + .3 * g, .14], k * 3); k++; });
+  TREES.push({ P, N, C, n }); }
+for (let i = 0; i < 9; i++) FOREST.push({ v: i % 3, u: -15 + i * 30 / 9 + R0() * 2, l: 2.4 + R0() * 4.5, s: 1.7 + R0() * 1.2 });
+
+const LIGHT_IDS = ['mode', 'palette', 'bulbs', 'turns', 'axis', 'blink', 'topper', 'intro', 'bpm'];
+const SHARE_IDS = LIGHT_IDS.concat(['scene', 'spin', 'zoom', 'snow', 'stars', 'mirror', 'caption', 'format', 'cell', 'ramp', 'points', 'paint', 'repaint', 'code', 'from', 'word']);
+const val = id => { const e = $(id); return e.type === 'checkbox' ? (e.checked ? '1' : '0') : e.value; };
+const setVal = (id, v) => { const e = $(id); if (!e) return; if (e.type === 'checkbox') e.checked = v === '1' || v === true; else e.value = v; e.dispatchEvent(new Event('input')); };
+const beatUnit = () => { const b = +$('bpm').value; return b ? 60 / b : 0.56; };          // seconds per beat: the build-up is timed in beats so it lands on the music
+const opts = () => { const u = beatUnit(), intro = $('intro').checked; return { mode: $('mode').value, palette: $('palette').value, bulbs: +$('bulbs').value, turns: +$('turns').value, axis: $('axis').value,
+  blink: +$('blink').value, topper: $('topper').checked, intro, u, t0: intro ? 3.6 * u : 0.5, span: 8 * u }; };
+function setStatus(msg, err) { const s = $('status'); s.textContent = msg; s.className = err ? 'err' : ''; }
+
+function setModel(raw, name, look) {
+  S.raw = raw; S.name = name; S.quarter = 0; S.flip = false; S.zUp = !!raw.zUp;
+  if (look) { $('topper').checked = look.topper; $('repaint').checked = look.repaint; if (look.paint) $('paint').value = look.paint; if (look.mode) $('mode').value = look.mode; $('bulbs').value = look.bulbs || 260; $('bulbs').dispatchEvent(new Event('input')); }
+  rebuildModel(true);
+}
+function rebuildModel(fresh) {
+  S.dense = normalize(S.raw, S.zUp, S.quarter, S.flip);
+  if (fresh) $('twoSided').checked = S.dense.inward > 0.3;
+  $('repaint').disabled = !S.dense.tint; if (!S.dense.tint) $('repaint').checked = true;
+  recolor(); rebuildLights(); S.t0 = performance.now(); S.drag = 0;
+  if (S.preset === '') setStatus(S.name + ' is ready.' + (S.dense.inward > 0.3 ? ' It has messy faces, so the fix is switched on.' : ''));
+}
+function recolor() {
+  const d = S.dense, C = new Float32Array(d.n * 3), r = rng(5), h = $('paint').value, rep = $('repaint').checked || !d.tint;
+  const p = [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+  for (let k = 0; k < d.n; k++) { const j = 1 + gauss(r) * 0.06, own = d.tint && !(rep && (!d.paint || d.paint[k]));
+    for (let c = 0; c < 3; c++) C[k * 3 + c] = own ? 0.2 + 0.8 * d.tint[k * 3 + c] : Math.min(1, Math.max(0, p[c] * j * (d.paint && d.paint[k] === 2 ? 0.5 : 1))); }
+  S.body = C;
+}
+function rebuildLights() { if (S.dense) S.lights = buildLights(S.dense, opts()); }
+
+function resize() {
+  [PW, PH] = $('format').value.split('x').map(Number); CW = +$('cell').value; CH = CW * 2;
+  W = Math.floor(PW / CW); H = Math.floor(PH / CH); OX = (PW - W * CW) >> 1; OY = (PH - H * CH) >> 1;
+  cv.width = PW; cv.height = PH;
+  depth = new Float32Array(W * H); chr = new Uint8Array(W * H); col = new Float32Array(W * H * 3); emit = new Uint8Array(W * H); halo = new Float32Array(W * H * 3);
+  img = ctx.createImageData(PW, PH); px32 = new Uint32Array(img.data.buffer);
+  const g = document.createElement('canvas'); g.width = CW; g.height = CH; const gx = g.getContext('2d', { willReadFrequently: true });
+  gx.font = 'bold ' + Math.round(CH * 0.82) + 'px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
+  gx.textAlign = 'center'; gx.textBaseline = 'middle'; gx.fillStyle = '#fff'; atlas = [];
+  for (let c = 0; c < 128; c++) { if (c < 33 || c > 126) { atlas.push(null); continue; }
+    gx.clearRect(0, 0, CW, CH); gx.fillText(String.fromCharCode(c), CW / 2, CH / 2 + 0.5);
+    const d = gx.getImageData(0, 0, CW, CH).data, a = new Uint8Array(CW * CH); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3]; atlas.push(a); }
+  buildCaption();
+}
+function setRamp() { ramp = Array.from($('ramp').value, c => c.charCodeAt(0)); }
+function siteLabel() { return /^https?:$/.test(location.protocol) && location.hostname && !/^(localhost|127\.|\[)/.test(location.hostname) ? location.hostname.replace(/^www\./, '') : SITE; }
+function captionText() { return $('caption').value.trim().toUpperCase(); }
+function textBitmap(lines, rows) {            // draw text with a normal font at grid resolution; each pixel becomes a character
+  const c = document.createElement('canvas'); c.width = W; c.height = rows * lines.length;
+  const x = c.getContext('2d', { willReadFrequently: true }), fam = 'px "Arial Black", Impact, "Helvetica Neue", Arial, sans-serif';
+  lines.forEach((s, i) => { let fs = rows * 2 * 0.98; x.setTransform(1, 0, 0, 1, 0, 0); x.font = '900 ' + fs + fam; const w = x.measureText(s).width; if (w > W * 0.94) fs *= W * 0.94 / w;
+    x.setTransform(1, 0, 0, CW / CH, 0, 0); x.font = '900 ' + fs + fam; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff'; x.fillText(s, W / 2, (i + 0.5) * rows * CH / CW); });
+  const d = x.getImageData(0, 0, W, c.height).data, a = new Uint8Array(W * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+  return { a, rows: c.height };
+}
+function buildCaption() {
+  capBmp = markBmp = null; if (!W) return; const s = captionText();
+  if (s) { let lines = [s]; if (s.length > 16 && s.includes(' ')) { let b = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (b < 0 || Math.abs(i - s.length / 2) < Math.abs(b - s.length / 2))) b = i; lines = [s.slice(0, b), s.slice(b + 1)]; }
+    capBmp = textBitmap(lines, Math.max(lines.length > 1 ? 7 : 9, Math.round(H * (lines.length > 1 ? 0.052 : 0.07)))); }
+  markBmp = textBitmap([siteLabel().toUpperCase()], Math.max(6, Math.round(H * 0.042)));                    // the site name, big enough to read on a phone
+}
+
+// ================================================================ ONE FRAME: FILL THE CHARACTER GRID
+function frame(t) {
+  const d = S.dense, top = d.size[1], aspect = CH / CW, drive = $('scene').value === 'drive', speedV = +$('spin').value;
+  const pr = $('code').checked ? Math.max(6, Math.round(H * 0.2)) : 0, base = H - pr, VH = H - pr * 0.8; panelBase = pr ? base : 1e9;   // rows left for the picture
+  const ex = 0, ty = top * 0.3, ey = ty + 1.25, ez = 6.6;
+  let fy = ty - ey, fz = -ez; const fl = Math.hypot(fy, fz); fy /= fl; fz /= fl;                    // camera looks down -Z, tilted
+  const short = Math.min(H, W / aspect), vis = 2 * fl * Math.tan(15 * Math.PI / 180) / short;       // world units per row
+  const fit = Math.min(0.80 * vis * (W / aspect) / Math.hypot(d.size[0], d.size[2]), 0.74 * vis * VH / (top * (drive ? 1.2 : 1.9) + 0.4));
+  const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : 1) * +$('zoom').value;
+  const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
+  const psi = 0.42 + S.drag, Dx = Math.cos(psi), Dz = Math.sin(psi), dist = drive ? Math.abs(speedV) * 11 * t : 0;   // driving: heading and distance covered
+  const yaw = drive ? d.fwdAngle - psi : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
+        ca = Math.cos(yaw), sa = Math.sin(yaw);
+  const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : 0;
+  const two = $('twoSided').checked, mirror = $('mirror').checked && !drive, intro = $('intro').checked;
+  const u = beatUnit(), bpm = +$('bpm').value, beat = bpm ? 0.42 + 0.78 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights flash on every beat
+  const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
+  depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0);
+
+  const plot = (x, y, z, r, g, b, glyph, em) => {
+    const dy = y - ey, dz = z - ez, zc = dy * fy + dz * fz; if (zc < 0.05) return;
+    const sx = Math.floor(W / 2 + x / zc * F * aspect), sy = Math.floor(VH / 2 - (dz * fy - dy * fz) / zc * F);
+    if (sx < 0 || sx >= W || sy < 0 || sy >= H) return;
+    const i = sy * W + sx; if (zc >= depth[i]) return;
+    depth[i] = zc; chr[i] = glyph; emit[i] = em; col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b;
+  };
+  const lit = (x, y, z, nx, ny, nz, r, g, b, dim, twoS, shine) => {                                  // a surface point: light it, then plot it
+    let vx = ex - x, vy = ey - y, vz = ez - z; const vl = Math.hypot(vx, vy, vz); vx /= vl; vy /= vl; vz /= vl;
+    const facing = nx * vx + ny * vy + nz * vz;
+    if (facing < 0) { if (twoS) { nx = -nx; ny = -ny; nz = -nz; } else if (facing < -0.08) return; }
+    const ndl = Math.max(0, nx * Lx + ny * Ly + nz * Lz), hx = Lx + vx, hy = Ly + vy, hz = Lz + vz, hl = Math.hypot(hx, hy, hz);
+    const spec = shine * Math.pow(Math.max(0, (nx * hx + ny * hy + nz * hz) / hl), 28), lum = amb + (1 - amb) * ndl, m = (0.3 + 0.7 * lum) * dim;
+    plot(x, y, z, r * m + spec * dim, g * m + spec * dim, b * m + spec * dim, ramp[Math.max(1, Math.min(nr, Math.round(Math.min(1, (lum + spec) * dim) * nr)))], 0);
+  };
+
+  // the model (and its mirror image in the floor)
+  const P = d.P, N = d.N, C = S.body, np = Math.floor(Math.min(d.n, +$('points').value, S.cap)), la = d.la, fs = d.fs;
+  const roll = drive && d.wheel ? d.wheels.map(w => [Math.cos(dist / w.r), Math.sin(dist / w.r)]) : null;
+  for (let pass = 0; pass < (mirror ? 2 : 1); pass++) {
+    const my = pass ? -1 : 1, dim = pass ? 0.33 : 1;
+    for (let k = 0; k < np; k++) {
+      const o = k * 3; let px = P[o], py = P[o + 1], pz = P[o + 2], qx = N[o], qy = N[o + 1], qz = N[o + 2];
+      if (py > grow - ((k * 40503) & 255) * 0.0008) continue;
+      if (roll && d.wheel[k]) { const wi = d.wheel[k] - 1, c = d.wheels[wi].c, cw = roll[wi][0], sw = roll[wi][1];        // spin the wheels
+        const u = (la ? pz - c[2] : px - c[0]) * fs, v = py - c[1], u2 = (u * cw + v * sw) * fs, nu = (la ? qz : qx) * fs, nu2 = (nu * cw + qy * sw) * fs;
+        py = c[1] - u * sw + v * cw; qy = -nu * sw + qy * cw; if (la) { pz = c[2] + u2; qz = nu2; } else { px = c[0] + u2; qx = nu2; } }
+      lit(px * ca + pz * sa, (py + bob) * my, -px * sa + pz * ca, qx * ca + qz * sa, qy * my, -qx * sa + qz * ca, C[o], C[o + 1], C[o + 2], dim, two, 0.7);
+    }
+    const L = S.lights.data;
+    for (let k = 0; k < S.lights.n; k++) { const o = k * 9; if (L[o + 7] > t) continue;                                   // not switched on yet
+      const pulse = (L[o + 8] > 0 ? (0.62 + 0.38 * Math.sin(L[o + 8] * t + L[o + 6])) * beat : 1) * dim;
+      plot(L[o] * ca + L[o + 2] * sa, (L[o + 1] + bob) * my, -L[o] * sa + L[o + 2] * ca, L[o + 3] * pulse, L[o + 4] * pulse, L[o + 5] * pulse,
+           ramp[Math.max(1, Math.min(nr, Math.round((0.45 + 0.55 * pulse) * nr)))], pass ? 0 : 1); }
+  }
+  // the ground
+  const half = d.size[la] / 2, Fx = Dx * half, Fz = Dz * half;
+  for (let k = 0; k < floorP.length; k += 4) { let x = floorP[k], z = floorP[k + 1], s = floorP[k + 2], r = .30 * s, g = .36 * s, b = .50 * s, gl = floorP[k + 3];
+    if (drive) { x = wrap(x - Dx * dist, -9, 18); z = wrap(z - Dz * dist, -9, 13.5); r = .40 * s; g = .46 * s; b = .60 * s;
+      const rx = x - Fx, rz = z - Fz, along = rx * Dx + rz * Dz, lat = Math.abs(-rx * Dz + rz * Dx);                    // headlight beam on the snow
+      if (along > 0.05 && along < 7 && lat < 0.3 + 0.34 * along) { const q = 1.5 / (1 + along * 0.45); r += q; g += q * .93; b += q * .7; if (q > .55) gl = 43; } }
+    plot(x, 0, z, r, g, b, gl, 0); }
+  if (drive) {
+    for (const tr of FOREST) { const T = TREES[tr.v], u = wrap(tr.u - dist, -15, 30), ox = Dx * u + Dz * tr.l, oz = Dz * u - Dx * tr.l, s = tr.s;     // pines sliding past
+      for (let k = 0; k < T.n; k++) { const o = k * 3; lit(ox + T.P[o] * s, T.P[o + 1] * s, oz + T.P[o + 2] * s, T.N[o], T.N[o + 1], T.N[o + 2], T.C[o], T.C[o + 1], T.C[o + 2], 1, false, 0.15); } }
+    const wdt = d.size[la ? 0 : 2] * 0.4;
+    for (let k = 0; k < 140; k++) { const o = k * 5, a = (t + sprayP[o]) % 0.55, sd = sprayP[o + 4];                                               // snow kicked up behind
+      const bx = -Dx * half * 0.7 + Dz * sd * wdt, bz = -Dz * half * 0.7 - Dx * sd * wdt, g = 0.9 - a;
+      plot(bx - Dx * sprayP[o + 1] * a + Dz * sprayP[o + 3] * a, Math.max(0.02, sprayP[o + 2] * a - 2.25 * a * a), bz - Dz * sprayP[o + 1] * a - Dx * sprayP[o + 3] * a, g, g, g * 1.05, k % 3 ? 46 : 42, 0); }
+  }
+  // falling snow
+  const ns = +$('snow').value, sdx = Dx * dist * 0.7, sdz = Dz * dist * 0.7;
+  for (let k = 0; k < ns; k++) { const o = k * 6, ph = snowP[o + 3], big = snowP[o + 5], g = 0.55 + 0.45 * ((big * 7) % 1);
+    plot(wrap(snowP[o] + 0.15 * Math.sin(1.3 * t + ph) - sdx, 0, 9) - 4.5, wrap(snowP[o + 1] - snowP[o + 4] * t, 0, 5),
+         wrap(snowP[o + 2] + 0.15 * Math.cos(1.1 * t + ph) - sdz, 0, 8) - 4, g, g, g, big > 0.9 ? 42 : big > 0.55 ? 43 : 46, 0); }
+
+  // glow: lights tint the cells around them
+  const cells = W * H;
+  for (let i = 0; i < cells; i++) if (emit[i]) { const cx = i % W, cy = (i / W) | 0;
+    for (let dy = -1; dy <= 1; dy++) { const yy = cy + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -3; dx <= 3; dx++) { const xx = cx + dx; if (xx < 0 || xx >= W || (!dx && !dy)) continue;
+        const w = 0.8 / (1.5 + dx * dx * 0.8 + dy * dy * 3), j = (yy * W + xx) * 3; halo[j] += w * col[i * 3]; halo[j + 1] += w * col[i * 3 + 1]; halo[j + 2] += w * col[i * 3 + 2]; } } }
+  for (let i = 0; i < cells; i++) { const j = i * 3, hm = Math.max(halo[j], halo[j + 1], halo[j + 2]); if (!hm || emit[i]) continue;
+    if (chr[i]) { col[j] += halo[j]; col[j + 1] += halo[j + 1]; col[j + 2] += halo[j + 2]; }
+    else if (hm > 0.16) { chr[i] = 46; col[j] = halo[j] * 1.6; col[j + 1] = halo[j + 1] * 1.6; col[j + 2] = halo[j + 2] * 1.6; } }
+
+  // stars (only where the sky is empty)
+  if ($('stars').checked) for (let k = 0; k < 300; k++) { const o = k * 6, x = Math.floor(starsP[o] * W), y = Math.floor(starsP[o + 1] * VH * (drive ? 0.45 : 0.58)), i = y * W + x;
+    if (chr[i]) continue; const b = starsP[o + 2] * (0.55 + 0.45 * Math.sin(starsP[o + 4] * t + starsP[o + 3])), g = 0.3 + 0.7 * b, tn = starsP[o + 5];
+    chr[i] = b > 0.62 ? 42 : b > 0.34 ? 43 : 46; col[i * 3] = g * tn; col[i * 3 + 1] = g * tn; col[i * 3 + 2] = g; }
+
+  // text
+  const text = (row, x0, str) => { for (let k = 0; k < str.length; k++) { const x = x0 + k, c = str.charCodeAt(k); if (x < 0 || x >= W || row < 0 || row >= H) continue;
+    const i = row * W + x; chr[i] = c > 32 && c < 127 ? c : 0; emit[i] = 0; col[i * 3] = .42; col[i * 3 + 1] = .47; col[i * 3 + 2] = .56; } };
+  let lit_n = 0; const LD = S.lights.data, per = S.lights.dots; for (let k = 0; k < S.lights.bulbs; k++) if (LD[k * per * 9 + 7] <= t) lit_n++;
+  const deg = (((yaw * 180 / Math.PI) % 360) + 360) % 360;
+  if (markBmp) { const r0 = Math.round(H * 0.035);                                                     // site name near the top
+    for (let y = 0; y < markBmp.rows; y++) for (let x = 0; x < W; x++) { const a = Math.min(1, markBmp.a[y * W + x] / 255 * 2.4); if (a < 0.3) continue;
+      const i = (r0 + y) * W + x, q = 0.22 + 0.4 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q * .85; col[i * 3 + 1] = q * .92; col[i * 3 + 2] = q * 1.15; } }
+  const from = $('from').value.trim();
+  text(base - 3, 0, siteLabel() + ' . ' + S.name + (from ? ' . from ' + from : ''));
+  text(base - 2, 0, (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs);
+  text(base - 1, 0, 'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas'));
+  const capT = intro ? 12 * u : 5;
+  if (capBmp && t > capT) { const rows = capBmp.rows, row0 = base - 5 - rows, upTo = Math.min(W, (t - capT) * W / 2);          // big caption made of characters, wiped on
+    for (let y = 0; y < rows; y++) for (let x = 0; x < upTo; x++) { const a = Math.min(1, capBmp.a[y * W + x] / 255 * 2.4); if (a < 0.3) continue;
+      const i = (row0 + y) * W + x, q = 0.45 + 0.55 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q; col[i * 3 + 1] = q * .88; col[i * 3 + 2] = q * .5; } }
+  if (pr) {                                                                                           // the code panel: this page's own source, typing itself
+    for (let i = base * W; i < cells; i++) { chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; }
+    const s = t * 2.4, first = Math.floor(s), vis = pr - 1;
+    for (let v = 0; v < vis; v++) { const li = (CODE_AT + first + v) % CODE.length, L = CODE[li], row = base + 1 + v, no = String(li + 1).padStart(4) + '  ';
+      const lim = v === vis - 1 ? Math.floor((s - first) * 1.5 * L.t.length) : 1e9;
+      for (let k = 0; k < no.length; k++) { const i = row * W + k, c = no.charCodeAt(k); if (c > 32) { chr[i] = c; col[i * 3] = .28; col[i * 3 + 1] = .31; col[i * 3 + 2] = .4; } }
+      for (let k = 0; k < L.t.length && k < lim && k + 6 < W; k++) { const c = L.t.charCodeAt(k); if (c <= 32 || c > 126) continue; const i = row * W + k + 6, q = CODE_COL[L.c[k]];
+        chr[i] = c; col[i * 3] = q[0]; col[i * 3 + 1] = q[1]; col[i * 3 + 2] = q[2]; } }
+  }
+}
+const CODE_COL = [[.62, .67, .78], [.9, .36, .5], [.55, .82, .5], [.96, .76, .32], [.42, .62, .98], [.38, .43, .53]]; let CODE_AT = 0;
+function loadCode() {                        // colour this page's own script so it can scroll under the picture
+  const re = /(\/\/.*$)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b(const|let|var|function|for|if|else|return|new|while|of|async|await|try|catch|throw|continue)\b|\b(\d+(?:\.\d+)?)\b|([A-Za-z_$][\w$]*)(?=\()/g;
+  CODE = document.currentScript.textContent.split('\n').map(l => l.replace(/\s+$/, '').slice(0, 220)).filter(l => l.trim()).map(t => { const c = new Uint8Array(t.length); let m; re.lastIndex = 0;
+    while ((m = re.exec(t))) { if (!m[0].length) { re.lastIndex++; continue; } c.fill(m[1] ? 5 : m[2] ? 2 : m[3] ? 1 : m[4] ? 3 : 4, m.index, m.index + m[0].length); } return { t, c }; });
+  CODE_AT = Math.max(0, CODE.findIndex(l => l.t.startsWith('function frame')));
+}
+loadCode();
+
+// ================================================================ DRAW THE GRID ONTO THE CANVAS
+function paint() {
+  px32.fill(0xFF000000 | BG[2] << 16 | BG[1] << 8 | BG[0]);
+  if (panelBase < H) px32.fill(0xFF000000 | 30 << 16 | 15 << 8 | 12, (OY + panelBase * CH) * PW);          // code panel sits on a slightly lighter strip
+  const data = img.data;
+  for (let cy = 0; cy < H; cy++) for (let cx = 0; cx < W; cx++) {
+    const i = cy * W + cx, j = i * 3, g = chr[i], x0 = OX + cx * CW, y0 = OY + cy * CH, panel = cy >= panelBase;
+    let b0 = panel ? 12 : BG[0], b1 = panel ? 15 : BG[1], b2 = panel ? 30 : BG[2];
+    if (halo[j] + halo[j + 1] + halo[j + 2] > 0.03) {                                                         // soft glow around lights
+      b0 += Math.min(42, halo[j] * 28); b1 += Math.min(42, halo[j + 1] * 28); b2 += Math.min(42, halo[j + 2] * 28);
+      const v = 0xFF000000 | (b2 << 16) | (b1 << 8) | (b0 | 0); for (let y = 0; y < CH; y++) px32.fill(v, (y0 + y) * PW + x0, (y0 + y) * PW + x0 + CW); }
+    if (!g) continue; const a = atlas[g]; if (!a) continue;
+    const r = Math.min(255, col[j] * 255), gg = Math.min(255, col[j + 1] * 255), b = Math.min(255, col[j + 2] * 255);
+    for (let y = 0; y < CH; y++) { let o = ((y0 + y) * PW + x0) * 4, k = y * CW;
+      for (let x = 0; x < CW; x++, o += 4, k++) { const al = a[k]; if (!al) continue; const f = al / 255;
+        data[o] = b0 + (r - b0) * f; data[o + 1] = b1 + (gg - b1) * f; data[o + 2] = b2 + (b - b2) * f; } }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+let ema = 16, ticks = 0;
+function loop() {
+  if (S.dense) { const a = performance.now(), t = (a - S.t0) / 1000; frame(t); paint(); ema += (performance.now() - a - ema) * 0.08;
+    if (++ticks % 40 === 0) { if (ema > 30 && S.cap > 12000) S.cap = Math.max(12000, Math.min(S.cap, +$('points').value) * 0.8); else if (ema < 13 && S.cap < 1e8) S.cap *= 1.2; }   // slow device: draw fewer points
+    if (S.viewer && t > 7 && $('cta').hidden) $('cta').hidden = false; }
+  requestAnimationFrame(loop);
+}
+
+// ================================================================ CHOOSING WHAT TO SHOW
+// These events show you whether people share. They go to Vercel Web Analytics, and to Plausible or Umami if you add either.
+function track(name, props) { try { window.va('event', { name, data: props }); if (window.plausible) window.plausible(name, { props }); else if (window.umami) window.umami.track(name, props); } catch (e) {} }
+const LOOKS = {
+  classic: { label: 'Classic',  palette: 'xmas',     ramp: ' .:-=+*#%@', paint: '#d41a1f' },
+  gold:    { label: 'Gold',     palette: 'warm',     ramp: ' .:-=+*#%@', paint: '#c79a1e' },
+  candy:   { label: 'Candy',    palette: 'candy',    ramp: ' .:-=+*#%@', paint: '#f2f2f6' },
+  ice:     { label: 'Ice',      palette: 'ice',      ramp: " .'`^*xX#",  paint: '#6fb2ff' },
+  matrix:  { label: 'Terminal', palette: 'redgreen', ramp: ' .:01',      paint: '#1fbf4f' },
+};
+function markChips() { for (const b of $('gallery').children) b.classList.toggle('on', b.dataset.k === (S.preset === '' ? 'file' : S.preset)); $('wordRow').hidden = S.preset !== 'text';
+  for (const b of $('scenes').children) b.classList.toggle('on', b.dataset.k === $('scene').value); }
+function useText(str, live) {
+  str = ((str || '').trim().slice(0, 14) || 'NOEL').toUpperCase();
+  try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; S.preset = 'text'; if (first) $('scene').value = 'spin'; markChips();
+    setModel(raw, str.toLowerCase(), first ? { topper: false, repaint: true, paint: '#d41a1f', mode: 'outline', bulbs: 150 } : null); buildCaption();
+    if (live) S.t0 = performance.now() - 4000; }                           // while typing, skip the build-up so the letters show straight away
+  catch (e) { setStatus(e.message || String(e), true); }
+}
+function usePreset(key) {
+  if (key === 'text') return useText($('word').value);
+  const p = PRESETS[key]; if (!p) return; S.preset = key; if (!p.car) $('scene').value = 'spin'; markChips();
+  setModel(p.make(120000, rng(3)), p.label.toLowerCase(), p); buildCaption(); setStatus('');
+}
+async function loadFiles(files) {
+  try {
+    const by = ext => files.find(f => f.name.toLowerCase().endsWith('.' + ext)), glb = by('glb'), obj = by('obj'), stl = by('stl'), mtl = by('mtl'), main = glb || obj || stl;
+    if (!main) throw new Error(by('gltf') ? 'Use the single-file .glb version instead of .gltf.' : by('fbx') || by('blend') ? 'That format is not supported. Export or download it as .glb.' : 'Use a .glb, .obj or .stl file.');
+    if (main.size > 300e6) throw new Error('That file is too big for a browser (over 300 MB).');
+    $('custom').open = true; setStatus('Loading ' + main.name + ' ...'); await nextFrame(); await nextFrame();
+    const mesh = glb ? await parseGLB(await glb.arrayBuffer()) : obj ? parseOBJ(await obj.text(), mtl ? await mtl.text() : null) : parseSTL(await stl.arrayBuffer());
+    if (mesh.T.length < 9) throw new Error('No triangles found in that file.');
+    const c = outerShell(sampleTriangles(mesh, 300000, rng(7)), 130000, rng(8));
+    S.preset = ''; markChips();
+    const segs = findCreases(mesh.T, c, rng(9));
+    setModel({ P: c.P, N: c.N, n: c.n, tint: c.tint, paint: pickPaintable(c), segs, zUp: !!stl }, main.name, { topper: false, repaint: false, mode: segs ? 'outline' : 'spiral' }); buildCaption();   // STL files are usually Z-up
+    track('model_upload', { type: main.name.split('.').pop().toLowerCase() });
+  } catch (e) { setStatus(e.message || String(e), true); }
+}
+
+// ================================================================ SAVING AND SENDING
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000); }
+const baseName = () => SITE + '-' + (S.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '_') || 'card');
+let lastVideo = null;
+function record() {
+  const btn = $('rec'), secs = Math.max(2, Math.min(60, +$('secs').value || 12)), no = 'This browser cannot record video. Send it as a link instead, or try Chrome, Edge or Safari on a computer.';
+  if (!window.MediaRecorder || !cv.captureStream) return setStatus(no, true);
+  const mime = ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+  if (!mime) return setStatus(no, true);
+  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 16e6 }), chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => { clearInterval(tick); btn.disabled = false; btn.textContent = 'Download the video';
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] }); download(blob, baseName() + '.' + ext);
+    try { lastVideo = new File([blob], baseName() + '.' + ext, { type: blob.type }); $('shareVid').hidden = !(navigator.canShare && navigator.canShare({ files: [lastVideo] })); } catch (e) { lastVideo = null; }
+    setStatus('Saved ' + baseName() + '.' + ext + (ext === 'webm' ? '. Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : '. Check your downloads.')); track('video_made', { shape: S.preset || 'upload' }); };
+  S.t0 = performance.now(); btn.disabled = true; rec.start(250);
+  const tick = setInterval(() => { btn.textContent = 'Recording ' + Math.min(secs, (performance.now() - S.t0) / 1000).toFixed(0) + ' / ' + secs + 's'; }, 200);
+  setTimeout(() => rec.state !== 'inactive' && rec.stop(), secs * 1000);
+}
+const DEFAULTS = {}, ALWAYS = ['topper', 'repaint', 'paint'];
+function cardLink() {                        // the link only carries what differs from a fresh page, so it stays short
+  const q = ['v=1', 'm=' + S.preset];
+  for (const id of SHARE_IDS) if (val(id) !== DEFAULTS[id] || ALWAYS.includes(id)) q.push(id + '=' + encodeURIComponent(val(id)));
+  return location.href.split('#')[0] + '#' + q.join('&');
+}
+async function sendLink() {
+  if (S.preset === '') return setStatus('A link cannot carry your own 3D file. Download the video instead, or pick one of the shapes above.', true);
+  const url = cardLink(), box = $('linkbox'); box.value = url; box.hidden = false; track('link_made', { shape: S.preset });
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {          // phones: open the share sheet
+    try { await navigator.share({ title: 'Made for you', url }); return setStatus('Sent.'); } catch (e) { if (e && e.name === 'AbortError') return setStatus('Your link is ready below.'); } }
+  try { await navigator.clipboard.writeText(url); setStatus('Link copied. Whoever opens it sees exactly this, then gets a button to make their own.'); }
+  catch (e) { box.focus(); box.select(); setStatus('Your link is ready below: copy it and send it.'); }
+}
+function shuffle() {
+  const r = Math.random, keys = Object.keys(LOOKS); useLook(keys[Math.floor(r() * keys.length)]);
+  setVal('turns', String(4 + Math.floor(r() * 18))); setVal('bulbs', String(160 + Math.floor(r() * 40) * 10)); setVal('blink', String(Math.floor(r() * 16) / 2));
+  if ($('repaint').checked) { const h = r() * 6, f = n => { const k = (n + h) % 6; return Math.round(255 * (0.9 - 0.75 * Math.max(0, Math.min(k, 4 - k, 1)))); };
+    setVal('paint', '#' + [f(5), f(3), f(1)].map(v => v.toString(16).padStart(2, '0')).join('')); }
+  for (const b of $('looks').children) b.classList.remove('on');
+}
+function useLook(k) { const L = LOOKS[k]; if (!L) return; setVal('palette', L.palette); setVal('ramp', L.ramp); if ($('repaint').checked) setVal('paint', L.paint);
+  for (const b of $('looks').children) b.classList.toggle('on', b.dataset.k === k); }
+function leaveViewer() {                     // the person who received a link wants to make one
+  document.body.classList.remove('viewer'); S.viewer = false; $('cta').hidden = true; track('make_own', { shape: S.preset });
+  $('from').value = ''; history.replaceState(null, '', location.href.split('#')[0]); setStatus('Your turn. Pick a shape and a colour.');
+}
+
+// ================================================================ WIRING
+const chip = (box, k, label, fn) => { const b = document.createElement('button'); b.textContent = label; b.dataset.k = k; b.onclick = fn; $(box).appendChild(b); };
+for (const [k, p] of Object.entries(PRESETS)) chip('gallery', k, p.label, () => usePreset(k));
+chip('gallery', 'text', 'A word', () => { usePreset('text'); $('word').focus(); });
+chip('gallery', 'file', 'Your 3D file', () => $('file').click());
+for (const o of $('scene').options) chip('scenes', o.value, o.textContent, () => setVal('scene', o.value));
+for (const [k, L] of Object.entries(LOOKS)) chip('looks', k, L.label, () => useLook(k));
+for (const lab of document.querySelectorAll('label.row')) { const inp = lab.querySelector('input[type=range]'), out = lab.querySelector('output');
+  if (inp && out) { const upd = () => out.textContent = inp.value; inp.addEventListener('input', upd); upd(); } }
+for (const id of LIGHT_IDS) $(id).addEventListener('input', rebuildLights);
+$('paint').addEventListener('input', e => { if (e.isTrusted) $('repaint').checked = true; });   // picking a colour means you want it used
+for (const id of ['paint', 'repaint']) $(id).addEventListener('input', () => S.dense && recolor());
+for (const id of ['format', 'cell']) $(id).addEventListener('input', resize);
+$('intro').addEventListener('input', () => { S.t0 = performance.now(); });
+$('ramp').addEventListener('input', setRamp);
+$('caption').addEventListener('input', buildCaption);
+let typing = 0;
+$('word').addEventListener('input', () => { if (S.preset === 'text') { clearTimeout(typing); typing = setTimeout(() => useText($('word').value, true), 200); } });
+$('word').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+$('scene').addEventListener('input', () => { S.t0 = performance.now(); S.drag = 0; markChips(); });
+$('bUp').onclick = () => { S.zUp = !S.zUp; rebuildModel(false); };
+$('bTurn').onclick = () => { S.quarter = (S.quarter + 1) % 4; rebuildModel(false); };
+$('bFlip').onclick = () => { S.flip = !S.flip; rebuildModel(false); };
+$('replay').onclick = $('ctaReplay').onclick = () => { S.t0 = performance.now(); if (S.viewer) $('cta').hidden = true; };
+$('ctaMake').textContent = 'Make your own'; $('ctaMake').onclick = leaveViewer;
+$('file').addEventListener('change', e => { if (e.target.files.length) loadFiles([...e.target.files]); e.target.value = ''; });
+$('rec').onclick = record; $('send').onclick = sendLink; $('shuffle').onclick = shuffle;
+$('shareVid').onclick = () => { if (lastVideo && navigator.share) navigator.share({ files: [lastVideo] }).catch(() => {}); };
+$('linkbox').onclick = e => e.target.select();
+$('png').onclick = () => cv.toBlob(b => download(b, baseName() + '.png'), 'image/png');
+addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag'); });
+addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drag'); });
+addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('drag'); if (e.dataTransfer.files.length) { if (S.viewer) leaveViewer(); loadFiles([...e.dataTransfer.files]); } });
+let dragX = null;                                                           // drag the picture sideways to turn the model
+cv.addEventListener('pointerdown', e => { dragX = e.clientX; });
+addEventListener('pointermove', e => { if (dragX !== null) { S.drag += (e.clientX - dragX) * 0.012; dragX = e.clientX; } });
+addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointercancel', () => { dragX = null; });
+
+// ================================================================ START
+for (const id of SHARE_IDS) DEFAULTS[id] = val(id);
+const start = new URLSearchParams(location.hash.slice(1));
+for (const id of ['word', 'from', 'caption', 'scene']) if (start.has(id)) $(id).value = start.get(id).slice(0, $(id).maxLength > 0 ? $(id).maxLength : 40);
+resize(); setRamp();
+usePreset(PRESETS[start.get('m')] || start.get('m') === 'text' ? start.get('m') : 'coupe');
+for (const id of SHARE_IDS) if (start.has(id) && !['word', 'from', 'caption'].includes(id)) setVal(id, start.get(id));
+markChips();
+if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
+  $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
