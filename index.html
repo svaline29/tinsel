@@ -102,6 +102,8 @@
     <h2>Style</h2>
     <div class="btns" id="looks"></div>
     <label class="chk"><input id="codeMain" type="checkbox" checked> Show the code at the bottom</label>
+    <h2>Size</h2>
+    <div class="btns" id="sizes"></div>
     <h2>Music</h2>
     <div class="btns" id="songs"></div>
     <label class="field" id="spRow" hidden>Spotify song link<input id="spLink" type="text" placeholder="paste a Spotify song link, press Enter" autocomplete="off" spellcheck="false"></label>
@@ -162,7 +164,7 @@
       <label class="chk"><input id="code" type="checkbox" checked> Show the code at the bottom</label>
 
       <h2>Video</h2>
-      <label class="row two">Shape<select id="format"><option value="1080x1920">Vertical (Reels, TikTok, Shorts)</option><option value="1080x1080">Square</option><option value="1920x1080">Wide (YouTube)</option></select></label>
+      <label class="row two">Size<select id="format"><option value="1080x1920">Phone (Reels, TikTok)</option><option value="1080x1080">Square</option><option value="1920x1080">Wide (YouTube, X)</option></select></label>
       <label class="row two">Characters<select id="cell"><option value="5">Tiny (most detail)</option><option value="6" selected>Small</option><option value="8">Medium</option><option value="10">Large</option><option value="12">Chunky (retro)</option></select></label>
       <label class="row two">Character set<select id="ramp"><option value=" .:-=+*#%@">Classic  .:-=+*#%@</option><option value=" .,:;i1tfLCG08@">Dense  .,:;i1tfLCG08@</option><option value=" .:01">Binary  .:01</option><option value=" .'`^*xX#">Frost  .'`^*xX#</option></select></label>
       <label class="row">Points<input id="points" type="range" min="8000" max="120000" step="2000" value="44000"><output></output></label>
@@ -704,6 +706,8 @@ function buildCaption() {
   if (s) { let lines = [s]; if (s.length > 16 && s.includes(' ')) { let b = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (b < 0 || Math.abs(i - s.length / 2) < Math.abs(b - s.length / 2))) b = i; lines = [s.slice(0, b), s.slice(b + 1)]; }
     capBmp = textBitmap(lines, Math.max(lines.length > 1 ? 7 : 9, Math.round(H * (lines.length > 1 ? 0.052 : 0.07)))); }
   markBmp = textBitmap([siteLabel().toUpperCase()], Math.max(6, Math.round(H * 0.042)));                    // the site name, big enough to read on a phone
+  let x0 = W, x1 = 0; for (let i = 0; i < markBmp.a.length; i++) if (markBmp.a[i] > 76) { const x = i % W; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  markBmp.x0 = Math.max(0, x0 - 2); markBmp.x1 = Math.min(W - 1, x1 + 2);                                    // how wide the name is, plus a little margin
 }
 
 // ================================================================ ONE FRAME: FILL THE CHARACTER GRID
@@ -802,6 +806,7 @@ function frame(t) {
   let lit_n = 0; const LD = S.lights.data, per = S.lights.dots; for (let k = 0; k < S.lights.bulbs; k++) if (LD[k * per * 9 + 7] <= t) lit_n++;
   const deg = (((yaw * 180 / Math.PI) % 360) + 360) % 360;
   if (markBmp) { const r0 = Math.round(H * 0.035);                                                     // site name near the top
+    for (let y = -1; y <= markBmp.rows; y++) for (let x = markBmp.x0; x <= markBmp.x1; x++) { const i = (r0 + y) * W + x; chr[i] = 0; emit[i] = 0; }   // clear a strip behind it, so trees and snow never tangle with the letters
     for (let y = 0; y < markBmp.rows; y++) for (let x = 0; x < W; x++) { const a = Math.min(1, markBmp.a[y * W + x] / 255 * 2.4); if (a < 0.3) continue;
       const i = (r0 + y) * W + x, q = 0.22 + 0.4 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q * .85; col[i * 3 + 1] = q * .92; col[i * 3 + 2] = q * 1.15; } }
   const from = $('from').value.trim();
@@ -896,7 +901,8 @@ function setMusic(key, play) {               // key: '' (off), a name from SONGS
   if (song) setVal('bpm', String(song.bpm));                               // lights pulse at the song's tempo
 }
 function markChips() { for (const b of $('gallery').children) b.classList.toggle('on', b.dataset.k === (S.preset === '' ? 'file' : S.preset)); $('wordRow').hidden = S.preset !== 'text';
-  for (const b of $('scenes').children) b.classList.toggle('on', b.dataset.k === $('scene').value); }
+  for (const b of $('scenes').children) b.classList.toggle('on', b.dataset.k === $('scene').value);
+  for (const b of $('sizes').children) b.classList.toggle('on', b.dataset.k === $('format').value); }
 function useText(str, live) {
   str = ((str || '').trim().slice(0, 14) || 'NOEL').toUpperCase();
   try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; S.preset = 'text'; if (first) $('scene').value = 'spin'; markChips();
@@ -979,6 +985,7 @@ for (const [k, p] of Object.entries(PRESETS)) chip('gallery', k, p.label, () => 
 chip('gallery', 'text', 'A word', () => { usePreset('text'); $('word').focus(); });
 chip('gallery', 'file', 'Your 3D file', () => $('file').click());
 for (const o of $('scene').options) chip('scenes', o.value, o.textContent, () => setVal('scene', o.value));
+for (const o of $('format').options) chip('sizes', o.value, o.textContent, () => setVal('format', o.value));   // the same choice also sits under Customize everything
 for (const [k, L] of Object.entries(LOOKS)) chip('looks', k, L.label, () => useLook(k));
 chip('songs', 'off', 'Off', () => { $('spRow').hidden = true; setMusic('', false); setVal('bpm', '0'); });
 for (const [k, sg] of Object.entries(SONGS)) chip('songs', k, sg.label, () => { $('spRow').hidden = true; setMusic(k, true); });
@@ -990,6 +997,7 @@ for (const id of LIGHT_IDS) $(id).addEventListener('input', rebuildLights);
 $('paint').addEventListener('input', e => { if (e.isTrusted) $('repaint').checked = true; });   // picking a colour means you want it used
 for (const id of ['paint', 'repaint']) $(id).addEventListener('input', () => S.dense && recolor());
 for (const id of ['format', 'cell']) $(id).addEventListener('input', resize);
+$('format').addEventListener('input', markChips);
 $('intro').addEventListener('input', () => { S.t0 = performance.now(); });
 $('ramp').addEventListener('input', setRamp);
 $('caption').addEventListener('input', buildCaption);
@@ -1018,6 +1026,9 @@ addEventListener('pointermove', e => { if (dragX !== null) { S.drag += (e.client
 addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointercancel', () => { dragX = null; });
 
 // ================================================================ START
+// A phone starts with the tall phone shape; anything else starts wide. A link carries a size only if its maker changed it, so each viewer gets the shape that fits their screen.
+const PHONE = /iPhone|iPod|Android.+Mobile|Windows Phone/i.test(navigator.userAgent) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600);
+$('format').value = PHONE ? '1080x1920' : '1920x1080';
 for (const id of SHARE_IDS) DEFAULTS[id] = val(id);
 const start = new URLSearchParams(location.hash.slice(1));
 for (const id of ['word', 'from', 'caption', 'scene']) if (start.has(id)) $(id).value = start.get(id).slice(0, $(id).maxLength > 0 ? $(id).maxLength : 40);
