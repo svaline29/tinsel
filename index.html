@@ -675,7 +675,8 @@ function resize() {
   buildCaption();
 }
 function setRamp() { ramp = Array.from($('ramp').value, c => c.charCodeAt(0)); }
-function siteLabel() { return /^https?:$/.test(location.protocol) && location.hostname && !/^(localhost|127\.|\[)/.test(location.hostname) ? location.hostname.replace(/^www\./, '') : SITE; }
+function siteLabel() { const h = location.hostname.replace(/^www\./, '');          // your own domain if you have one; never an auto-generated *.vercel.app address
+  return /^https?:$/.test(location.protocol) && h && !/^(localhost|127\.|\[)/.test(h) && !/\.vercel\.app$/.test(h) ? h : SITE; }
 function captionText() { return $('caption').value.trim().toUpperCase(); }
 function textBitmap(lines, rows) {            // draw text with a normal font at grid resolution; each pixel becomes a character
   const c = document.createElement('canvas'); c.width = W; c.height = rows * lines.length;
