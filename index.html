@@ -31,6 +31,9 @@
          border-radius:10px; padding:16px; text-align:center; box-shadow:0 12px 48px rgba(0,0,0,.7); animation:rise .5s ease-out; }
   #cta p { margin:0 0 12px; color:#fff; font-size:15px; }
   @keyframes rise { from { opacity:0; transform:translate(-50%, 16px); } to { opacity:1; transform:translate(-50%, 0); } }
+  #yt { width:100%; aspect-ratio:16/9; min-height:200px; border:1px solid var(--line); border-radius:6px; background:#000; display:block; }
+  #viewMusic { position:absolute; top:14px; left:50%; transform:translateX(-50%); width:min(92%,360px); z-index:2; }
+  #viewMusic .note { text-align:center; }
   aside { background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:18px 18px 28px; }
   body.viewer main { grid-template-columns:1fr; } body.viewer aside, body.viewer #hint { display:none; } body.viewer #stage { padding:0; } body.viewer #cv { border:0; border-radius:0; }
   h1 { font-size:22px; margin:0; color:#fff; letter-spacing:.04em; }
@@ -78,6 +81,7 @@
     <canvas id="cv" width="1080" height="1920" aria-label="Animated preview"></canvas>
     <div id="hint">drag to turn it &middot; drop a 3D file anywhere to use your own</div>
     <div id="drop">Drop a .glb, .obj or .stl file</div>
+    <div id="viewMusic" hidden><button id="musicPlay" class="go">Play the music</button></div>
     <div id="cta" hidden>
       <p id="ctaText"></p>
       <div class="btns"><button id="ctaMake" class="go">Make one for someone</button></div>
@@ -98,6 +102,13 @@
     <h2>Style</h2>
     <div class="btns" id="looks"></div>
     <label class="chk"><input id="codeMain" type="checkbox" checked> Show the code at the bottom</label>
+    <h2>Music</h2>
+    <div class="btns" id="songs"></div>
+    <label class="field" id="ytRow" hidden>YouTube link<input id="ytLink" type="text" placeholder="paste a YouTube link, press Enter" autocomplete="off" spellcheck="false"></label>
+    <div id="musicBox" hidden>
+      <iframe id="yt" title="Music player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <p class="note">Plays from YouTube. Downloaded videos have no sound: add the song in Instagram or TikTok when you post.</p>
+    </div>
     <div class="cols">
       <label class="field">From<input id="from" type="text" maxlength="20" placeholder="you (optional)" autocomplete="off"></label>
       <label class="field">Caption<input id="caption" type="text" maxlength="40" value="MERRY CHRISTMAS"></label>
@@ -138,7 +149,7 @@
       <label class="row">Turns<input id="turns" type="range" min="2" max="26" step="1" value="10"><output></output></label>
       <label class="row two">Wrap around<select id="axis"><option value="auto">Longest side</option><option value="y">Its height</option><option value="len">Its length</option></select></label>
       <label class="row">Blink<input id="blink" type="range" min="0" max="12" step="0.5" value="5"><output></output></label>
-      <label class="row two">Pulse to music<select id="bpm"><option value="0">Off</option><option value="90">90 beats a minute</option><option value="100">100</option><option value="107">107 (Last Christmas)</option><option value="120">120</option><option value="128">128</option><option value="140">140</option></select></label>
+      <label class="row two">Pulse to music<select id="bpm"><option value="0">Off</option><option value="90">90 beats a minute</option><option value="100">100</option><option value="107">107 (Last Christmas)</option><option value="120">120</option><option value="128">128</option><option value="140">140</option><option value="150">150 (All I Want for Christmas Is You)</option></select></label>
       <label class="chk"><input id="topper" type="checkbox"> Star on top</label>
 
       <h2>Scene</h2>
@@ -857,6 +868,16 @@ const LOOKS = {
   ice:     { label: 'Ice',      palette: 'ice',      ramp: " .'`^*xX#",  paint: '#6fb2ff' },
   matrix:  { label: 'Terminal', palette: 'redgreen', ramp: ' .:01',      paint: '#1fbf4f' },
 };
+// Music plays through YouTube's own player, so the songs stay on YouTube and nothing is copied onto this site.
+const SONGS = { wham: { label: 'Last Christmas', id: 'E8gmARGvPlI', bpm: 107 }, mariah: { label: 'All I Want for Christmas Is You', id: 'aAkMkVFwAoo', bpm: 150 } };
+const ytId = str => { const m = /(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/.exec(str || '') || /^([\w-]{11})$/.exec((str || '').trim()); return m ? m[1] : ''; };
+function setMusic(key, play) {               // key: '' (off), a name from SONGS, or a YouTube link or id
+  const song = SONGS[key], id = song ? song.id : ytId(key); S.music = id ? (song ? key : id) : '';
+  for (const b of $('songs').children) b.classList.toggle('on', b.dataset.k === (S.music ? (song ? key : 'own') : (b.dataset.k === 'own' && !$('ytRow').hidden ? 'own' : 'off')));
+  $('musicBox').hidden = !id; $('yt').src = id ? 'https://www.youtube-nocookie.com/embed/' + id + '?playsinline=1&rel=0' + (play ? '&autoplay=1' : '') : 'about:blank';
+  if (song) setVal('bpm', String(song.bpm));                               // lights pulse at the song's tempo
+  if (id && play) S.t0 = performance.now();                                // start the picture and the song together
+}
 function markChips() { for (const b of $('gallery').children) b.classList.toggle('on', b.dataset.k === (S.preset === '' ? 'file' : S.preset)); $('wordRow').hidden = S.preset !== 'text';
   for (const b of $('scenes').children) b.classList.toggle('on', b.dataset.k === $('scene').value); }
 function useText(str, live) {
@@ -902,14 +923,14 @@ function record() {
   rec.onstop = () => { clearInterval(tick); btn.disabled = false; btn.textContent = 'Download the video';
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] }); download(blob, baseName() + '.' + ext);
     try { lastVideo = new File([blob], baseName() + '.' + ext, { type: blob.type }); $('shareVid').hidden = !(navigator.canShare && navigator.canShare({ files: [lastVideo] })); } catch (e) { lastVideo = null; }
-    setStatus('Saved ' + baseName() + '.' + ext + (ext === 'webm' ? '. Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : '. Check your downloads.')); track('video_made', { shape: S.preset || 'upload' }); };
+    setStatus('Saved ' + baseName() + '.' + ext + (S.music ? ' (no sound: add the song in Instagram or TikTok when you post)' : '') + (ext === 'webm' ? '. Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : '. Check your downloads.')); track('video_made', { shape: S.preset || 'upload' }); };
   S.t0 = performance.now(); btn.disabled = true; rec.start(250);
   const tick = setInterval(() => { btn.textContent = 'Recording ' + Math.min(secs, (performance.now() - S.t0) / 1000).toFixed(0) + ' / ' + secs + 's'; }, 200);
   setTimeout(() => rec.state !== 'inactive' && rec.stop(), secs * 1000);
 }
 const DEFAULTS = {}, ALWAYS = ['topper', 'repaint', 'paint'];
 function cardLink() {                        // the link only carries what differs from a fresh page, so it stays short
-  const q = ['v=1', 'm=' + S.preset];
+  const q = ['v=1', 'm=' + S.preset]; if (S.music) q.push('music=' + S.music);
   for (const id of SHARE_IDS) if (val(id) !== DEFAULTS[id] || ALWAYS.includes(id)) q.push(id + '=' + encodeURIComponent(val(id)));
   return location.href.split('#')[0] + '#' + q.join('&');
 }
@@ -932,6 +953,7 @@ function useLook(k) { const L = LOOKS[k]; if (!L) return; setVal('palette', L.pa
   for (const b of $('looks').children) b.classList.toggle('on', b.dataset.k === k); }
 function leaveViewer() {                     // the person who received a link wants to make one
   document.body.classList.remove('viewer'); S.viewer = false; $('cta').hidden = true; track('make_own', { shape: S.preset });
+  $('viewMusic').hidden = true; $('ytRow').after($('musicBox'));              // put the player back in the panel
   $('from').value = ''; history.replaceState(null, '', location.href.split('#')[0]); setStatus('Your turn. Pick a shape and a colour.');
 }
 
@@ -942,6 +964,11 @@ chip('gallery', 'text', 'A word', () => { usePreset('text'); $('word').focus(); 
 chip('gallery', 'file', 'Your 3D file', () => $('file').click());
 for (const o of $('scene').options) chip('scenes', o.value, o.textContent, () => setVal('scene', o.value));
 for (const [k, L] of Object.entries(LOOKS)) chip('looks', k, L.label, () => useLook(k));
+chip('songs', 'off', 'Off', () => { $('ytRow').hidden = true; setMusic('', false); setVal('bpm', '0'); });
+for (const [k, sg] of Object.entries(SONGS)) chip('songs', k, sg.label, () => { $('ytRow').hidden = true; setMusic(k, true); });
+chip('songs', 'own', 'Any YouTube song', () => { $('ytRow').hidden = false; setMusic('', false); $('ytLink').focus(); });
+$('ytLink').addEventListener('change', e => { if (ytId(e.target.value)) { setMusic(e.target.value, true); setVal('bpm', '0'); } else setStatus('That does not look like a YouTube link.', true); });
+$('musicPlay').onclick = () => { $('musicPlay').hidden = true; $('viewMusic').appendChild($('musicBox')); setMusic(S.music, true); };
 for (const lab of document.querySelectorAll('label.row')) { const inp = lab.querySelector('input[type=range]'), out = lab.querySelector('output');
   if (inp && out) { const upd = () => out.textContent = inp.value; inp.addEventListener('input', upd); upd(); } }
 for (const id of LIGHT_IDS) $(id).addEventListener('input', rebuildLights);
@@ -983,7 +1010,8 @@ resize(); setRamp();
 usePreset(PRESETS[start.get('m')] || start.get('m') === 'text' ? start.get('m') : 'coupe');
 for (const id of SHARE_IDS) if (start.has(id) && !['word', 'from', 'caption'].includes(id)) setVal(id, start.get(id));
 markChips();
-if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
+setMusic(start.get('music') || '', false);
+if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true; if (S.music) { $('musicBox').hidden = true; $('yt').src = 'about:blank'; $('viewMusic').hidden = false; }
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 requestAnimationFrame(loop);
 </script>
