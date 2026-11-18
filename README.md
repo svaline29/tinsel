@@ -9,12 +9,14 @@ It runs entirely in the browser: one HTML file, no build step, no server, nothin
 
 ## What you can do
 
-- Pick a shape: five car body styles, tree, rocket, snowman, gift, any word, or your own `.glb` / `.obj` / `.stl`
+- Pick a shape: any word, your own photo (it never leaves your device), a snow globe with your place or name, five car body styles, a steam train, a jet, a sleigh, tree, rocket, snowman, gift, or your own `.glb` / `.obj` / `.stl`
 - Lights that follow the model's edges (roofline, sills, wheel arches), or a wrapped string, or scattered bulbs
-- Two scenes: driving through snow (ground, snowfall and pines slide past, wheels turn) or spinning on ice with a reflection
+- Three scenes: driving through snow (ground, snowfall and pines slide past, wheels turn), flying through snow, or spinning on ice with a reflection
 - A build-up intro, a caption, and the page's own source code scrolling underneath
 - Lights that pulse to a tempo you choose, so the video lands on the beat of whatever song you add when you post it
-- Music through Spotify's own small player (two Christmas presets, or paste any Spotify song link); nothing is copied onto the site, and downloaded videos stay silent
+- Sound in the video: three old carols (Jingle Bells, Deck the Halls, Carol of the Bells) played by the page itself and recorded into the download, with the lights in time
+- Or time the lights to a pop song and preview it through Spotify's own small player; nothing is copied onto the site, that video stays silent, and you add the song in Instagram or TikTok when you post
+- On a phone, one button opens the share sheet to save the video or post it
 - Download an MP4 (vertical, square or wide), or send a link that replays exactly what you made
 
 ## Host it on Vercel
