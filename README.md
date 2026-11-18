@@ -5,7 +5,7 @@
 Wrap a car in Christmas lights and render it as ASCII. Or a tree, a rocket, a word, or any 3D model you drop in.
 It runs entirely in the browser: one HTML file, no build step, no server, nothing uploaded.
 
-**Try it:** https://wrapinlights.vercel.app
+**Try it:** https://wrapinlights.com
 
 ## What you can do
 

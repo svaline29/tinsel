@@ -7,9 +7,9 @@
 <meta name="description" content="Wrap a car, a tree or your own 3D model in Christmas lights, drawn in ASCII. Download the video or send it as a link. Free, nothing to install.">
 <meta property="og:title" content="Wrap anything in ASCII Christmas lights">
 <meta property="og:description" content="Pick a car, a tree or your own 3D model. Watch it light up. Download the video or send it. Free.">
-<meta property="og:url" content="https://wrapinlights.vercel.app/">
+<meta property="og:url" content="https://wrapinlights.com/">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://wrapinlights.vercel.app/og.png">
+<meta property="og:image" content="https://wrapinlights.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23070914'/%3E%3Ctext x='8' y='13' font-size='14' text-anchor='middle' fill='%23ffd66b' font-family='monospace'%3E*%3C/text%3E%3C/svg%3E">
 <style>
@@ -256,7 +256,7 @@
 
 <script>
 'use strict';
-const SITE = 'wrapinlights.vercel.app';   // stamped at the top of every video, so people who see one can find the site
+const SITE = 'wrapinlights.com';   // stamped at the top of every video, so people who see one can find the site
 const NAME = 'wrapinlights';              // short name used in the status line and in file names
 // Visitor counting on Vercel: switch on Web Analytics for the project and this starts reporting. It does nothing anywhere else.
 window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -877,7 +877,7 @@ function captionLines() { const s = captionText(); if (!s) return []; if (s.leng
 function buildCaption() {
   capBmp = stamp = null; if (!W) return; const lines = captionLines();
   if (lines.length) capBmp = textBitmap(lines, Math.max(9, Math.round(Math.min(PW, PH) * (lines.length > 1 ? 0.085 : 0.11) / CH2)), Math.floor(PW / CW2));   // the caption, built from characters half the size of the picture's so it stays easy to read
-  const fs = Math.round(Math.min(PW, PH) * 0.043), y = Math.round(PH * (PH > PW ? 0.15 : 0.055)), w = siteLabel().length * fs * 0.62;   // the site address: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
+  const fs = Math.round(Math.min(PW, PH) * 0.05), y = Math.round(PH * (PH > PW ? 0.15 : 0.06)), w = siteLabel().length * fs * 0.62;   // the site address: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
   stamp = { fs, y, r0: Math.max(0, Math.floor((y - fs * 0.85 - OY) / CH)), r1: Math.min(H - 1, Math.floor((y + fs * 0.85 - OY) / CH)), x0: Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW) - 1), x1: Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW) + 1) };
 }
 
