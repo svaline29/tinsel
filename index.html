@@ -146,6 +146,30 @@
     .tag { display:none; } h1 { margin-bottom:8px; }
     #actions { padding-top:8px; padding-bottom:calc(9px + env(safe-area-inset-bottom)); } button.go { padding:12px 8px; }
   }
+  /* ---- the new phone layout: the picture fills the screen, icons down the right open a sheet of choices */
+  body.m2 { overflow:hidden; }
+  body.m2 main { display:block; height:100vh; height:100dvh; }
+  body.m2 aside, body.m2 #hint, body.m2 #drop { display:none; }
+  body.m2 #stage { position:fixed; left:0; right:0; top:0; bottom:var(--m2b, 84px); height:auto; padding:0; border:0; z-index:1; background:var(--bg); transition:bottom .22s ease; }
+  body.m2 #cv { border:0; border-radius:0; }
+  #rail { position:absolute; right:4px; top:6px; bottom:6px; z-index:3; display:flex; flex-direction:column; justify-content:center; gap:3px; pointer-events:none; }
+  #rail button { pointer-events:auto; flex:0 1 54px; min-height:36px; width:54px; padding:0; border:0; border-radius:0; background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; color:#fff; font-size:9.5px; line-height:1.1; text-shadow:0 1px 3px #000, 0 0 8px #000; }
+  #rail i { display:flex; align-items:center; justify-content:center; height:70%; max-height:40px; aspect-ratio:1; border-radius:50%; background:rgba(12,15,30,.74); border:1px solid var(--edge); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); transition:border-color .12s, color .12s, background .12s; }
+  #rail svg { width:56%; height:56%; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  #rail button.on { color:var(--hot); } #rail button.on i { border-color:var(--hot); background:rgba(40,32,8,.85); }
+  #railTip { position:absolute; right:62px; top:50%; transform:translateY(-50%); z-index:3; padding:6px 10px; border-radius:999px; background:rgba(12,15,30,.85); border:1px solid var(--hot); color:var(--hot); font-size:12px; pointer-events:none; animation:fade 7s forwards; }
+  body.m2open #railTip { display:none; }
+  #sheet { position:fixed; left:0; right:0; bottom:0; z-index:8; display:flex; flex-direction:column; max-height:46vh; max-height:46dvh; background:var(--panel); border-top:1px solid var(--line); border-radius:18px 18px 0 0;
+           box-shadow:0 -18px 40px rgba(0,0,0,.6); padding-bottom:env(safe-area-inset-bottom); transform:translateY(105%); transition:transform .22s ease; }
+  body.m2open #sheet { transform:none; }
+  #sheetHead { display:flex; align-items:center; justify-content:space-between; padding:10px 14px 6px 18px; flex:none; }
+  #sheetHead b { font-size:15px; color:#fff; } #sheetDone { border-color:var(--hot); color:var(--hot); padding:7px 16px; }
+  #sheetBody { overflow-y:auto; overscroll-behavior:contain; padding:0 16px 14px; -webkit-overflow-scrolling:touch; }
+  #sheetBody .cat { display:none; } #sheetBody .cat.on { display:block; }
+  #sheetBody .cat[data-cat=sound]:not(.on) { display:block; height:0; overflow:hidden; visibility:hidden; }   /* a song that is playing keeps playing while another sheet is open */
+  #sheetBody h2 { margin:14px 0 8px; } #sheetBody .cat > :first-child { margin-top:4px; }
+  body.m2 #actions { position:fixed; left:0; right:0; bottom:0; z-index:7; margin:0; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  body.m2open #actions { display:none; }
   @media (prefers-reduced-motion:reduce) { * { transition:none !important; } #cta, #hint { animation:none; } }
 </style>
 </head>
@@ -1480,7 +1504,7 @@ const DEFAULTS = {}, ALWAYS = ['topper', 'repaint', 'paint'];
 function cardLink() {                        // the link only carries what differs from a fresh page, so it stays short
   const q = ['v=1', 'm=' + S.preset]; if (S.music) q.push('music=' + S.music); if (S.song !== 'jingle') q.push('song=' + (S.song || 'off'));
   for (const id of SHARE_IDS) if (val(id) !== DEFAULTS[id] || ALWAYS.includes(id)) q.push(id + '=' + encodeURIComponent(val(id)));
-  return location.href.split('#')[0] + '#' + q.join('&');
+  return location.href.split('#')[0].split('?')[0] + '#' + q.join('&');
 }
 async function sendLink() {
   if (S.preset === '') return setStatus(S.kind === 'photo' ? 'A link cannot carry your photo, because it never leaves this device. Make the video and share that instead.' : 'A link cannot carry your own 3D file. Download the video instead, or pick one of the shapes above.', true);
@@ -1499,7 +1523,7 @@ function shuffle() {
 function useLook(k) { const L = LOOKS[k]; if (!L) return; setVal('palette', L.palette); setVal('ramp', L.ramp); if ($('repaint').checked) setVal('paint', L.paint);
   markChips(); }
 function leaveViewer() {                     // the person who received a link wants to make one
-  document.body.classList.remove('viewer'); S.viewer = false; $('cta').hidden = true; track('make_own', { shape: S.preset });
+  document.body.classList.remove('viewer'); S.viewer = false; $('cta').hidden = true; track('make_own', { shape: S.preset }); if (M2) try { mobileUI(); } catch (e) {}
   $('from').value = ''; history.replaceState(null, '', location.href.split('#')[0]); setStatus('Your turn. Pick a shape and a colour.');
 }
 
@@ -1566,6 +1590,45 @@ cv.addEventListener('pointerdown', e => { dragX = e.clientX; });
 addEventListener('pointermove', e => { if (dragX !== null) { S.drag += (e.clientX - dragX) * 0.012; dragX = e.clientX; } });
 addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointercancel', () => { dragX = null; });
 
+// ================================================================ THE NEW PHONE LAYOUT
+// Nothing here runs unless it is switched on. It moves the same controls into sheets, so everything they do stays as it is.
+const ICONS = {
+  shape:  '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/>',
+  colour: '<path d="M12 3.5c3.3 4 5.5 6.8 5.5 10a5.5 5.5 0 0 1-11 0c0-3.2 2.2-6 5.5-10z"/><path d="M9.3 14.3a2.8 2.8 0 0 0 2 2.5"/>',
+  lights: '<path d="M2 7.5c4 4.5 16 4.5 20 0"/><path d="M5.5 9.5v1.300M12 10.900v1.300M18.5 9.5v1.300"/><ellipse cx="5.5" cy="13.4" rx="1.900" ry="2.600"/><ellipse cx="12" cy="14.800" rx="1.900" ry="2.600"/><ellipse cx="18.5" cy="13.4" rx="1.900" ry="2.600"/>',
+  scene:  '<path d="M2.500 19.500l6.300-9.500 3.900 5.900 2.600-3.700 6.200 7.300z"/><circle cx="17.300" cy="6.200" r="2.100"/>',
+  sound:  '<path d="M9 17.800V6.200l10-2v11.600"/><circle cx="6.600" cy="17.800" r="2.400"/><circle cx="16.600" cy="15.800" r="2.400"/>',
+  words:  '<path d="M5 6.500V5h14v1.500M12 5v14M9.200 19h5.600"/>',
+  style:  '<path d="M10 3l1.800 4.700 4.700 1.800-4.700 1.800L10 16l-1.800-4.700L3.500 9.500l4.700-1.800z"/><path d="M18 13.500l.9 2.300 2.300.9-2.300.9-.9 2.300-.9-2.300-2.300-.9 2.300-.9z"/>',
+  more:   '<path d="M4 7h9.500M18.500 7H20M4 17h1.500M10.500 17H20"/><circle cx="16" cy="7" r="2.300"/><circle cx="8" cy="17" r="2.300"/>',
+};
+function mobileUI() {
+  if (document.body.classList.contains('m2')) return;
+  const lab = id => $(id).closest('label'), box = (...els) => { const d = document.createElement('div'); d.className = 'btns'; d.append(...els); return d; }, head = t => { const h = document.createElement('h2'); h.textContent = t; return h; };
+  const cats = [                              // each icon, and the controls that live behind it
+    ['shape', 'Shape', [$('gallery'), $('wordRow'), $('modelBox'), document.querySelector('aside details.help')]],
+    ['colour', 'Colour', [$('swatches'), lab('repaint'), head('Themes'), $('looks')]],
+    ['lights', 'Lights', ['palette', 'mode', 'bulbs', 'blink', 'turns', 'axis', 'topper'].map(lab)],
+    ['scene', 'Scene', [$('scenes')].concat(['spin', 'zoom', 'snow', 'stars', 'mirror', 'acro', 'intro'].map(lab))],
+    ['sound', 'Sound', [$('tunes'), $('tuneNote'), $('popBox'), $('musicBox'), lab('bpm')]],
+    ['words', 'Words', [$('from').closest('.cols')]],
+    ['style', 'Style', [box($('shuffle')), lab('cell'), lab('ramp'), lab('codeMain')]],
+    ['more', 'More', [head('Video size'), $('sizes'), lab('secs'), lab('points'), box($('replay'), $('png')), $('about')]],
+  ];
+  const rail = document.createElement('div'), sheet = document.createElement('div'), tip = document.createElement('div'); rail.id = 'rail'; sheet.id = 'sheet'; tip.id = 'railTip'; tip.textContent = 'tap these to change it';
+  sheet.innerHTML = '<div id="sheetHead"><b id="sheetTitle"></b><button id="sheetDone">Done</button></div><div id="sheetBody"></div>';
+  const body = sheet.querySelector('#sheetBody'), fit = () => document.body.style.setProperty('--m2b', (document.body.classList.contains('m2open') ? sheet.offsetHeight : $('actions').offsetHeight) + 'px');
+  const open = k => { const was = document.body.classList.contains('m2open') && body.querySelector('.cat.on') && body.querySelector('.cat.on').dataset.cat; k = k === was ? '' : k;      // tapping the same icon again closes it
+    document.body.classList.toggle('m2open', !!k); for (const c of body.children) c.classList.toggle('on', c.dataset.cat === k); for (const b of rail.children) b.classList.toggle('on', b.dataset.cat === k);
+    if (k) { sheet.querySelector('#sheetTitle').textContent = cats.find(c => c[0] === k)[1]; body.scrollTop = 0; } fit(); };
+  for (const [k, title, els] of cats) { const c = document.createElement('div'); c.className = 'cat'; c.dataset.cat = k; c.append(...els.filter(Boolean)); body.appendChild(c);
+    const b = document.createElement('button'); b.dataset.cat = k; b.setAttribute('aria-label', title); b.innerHTML = '<i><svg viewBox="0 0 24 24">' + ICONS[k] + '</svg></i>' + title; b.onclick = () => open(k); rail.appendChild(b); }
+  document.body.classList.add('m2'); $('custom').open = true; $('stage').append(rail, tip); document.body.append(sheet, $('actions')); sheet.querySelector('#sheetDone').onclick = () => open('');
+  if (window.ResizeObserver) { const ro = new ResizeObserver(fit); ro.observe(sheet); ro.observe($('actions')); } addEventListener('resize', fit); fit();
+  if (window.visualViewport) { const vv = visualViewport, up = () => { sheet.style.bottom = Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'; }; vv.addEventListener('resize', up); vv.addEventListener('scroll', up); }   // keep the sheet above the keyboard
+}
+const M2 = new URLSearchParams(location.search).has('m2');      // switched on by adding ?m2 to the address, until it becomes the way phones see the site
+
 // ================================================================ START
 // A phone starts with the tall phone shape; anything else starts wide. A link carries a size only if its maker changed it, so each viewer gets the shape that fits their screen.
 const PHONE = /iPhone|iPod|Android.+Mobile|Windows Phone/i.test(navigator.userAgent) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600);
@@ -1583,6 +1646,7 @@ S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? st
 if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 tally('visit');
+if (M2 && !S.viewer) try { mobileUI(); } catch (e) { document.body.classList.remove('m2', 'm2open'); }
 $('about').addEventListener('toggle', e => { if (e.target.open && !$('counts').textContent) showCounts(false); });
 if (start.has('stats')) { $('about').open = true; showCounts(true); }
 requestAnimationFrame(loop);
