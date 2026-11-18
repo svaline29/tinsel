@@ -795,8 +795,8 @@ function buildLights(d, o) {
 // ================================================================ STATE
 const S = { raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
-let W = 0, H = 0, CW = 6, CH = 12, PW = 1080, PH = 1920, OX = 0, OY = 0;
-let depth, chr, col, emit, halo, img, px32, atlas, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
+let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
+let depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
 const cv = $('cv'), ctx = cv.getContext('2d');
 const R0 = rng(1), snowP = new Float32Array(1500 * 6), starsP = new Float32Array(300 * 6), floorP = [], sprayP = new Float32Array(140 * 5), trailP = new Float32Array(260 * 4), TREES = [], FOREST = [];
 for (let i = 0; i < 1500; i++) snowP.set([R0() * 9, R0() * 5, R0() * 8, R0() * 6.28, 0.45 * (0.6 + 0.8 * R0()), R0()], i * 6);
@@ -842,36 +842,41 @@ function recolor() {
 }
 function rebuildLights() { if (S.dense) S.lights = buildLights(S.dense, opts()); }
 
+function glyphs(cw, ch) {                     // every printable character, drawn once at this size and kept as a mask
+  const g = document.createElement('canvas'); g.width = cw; g.height = ch; const gx = g.getContext('2d', { willReadFrequently: true }), out = [];
+  gx.font = 'bold ' + Math.round(ch * 0.82) + 'px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace'; gx.textAlign = 'center'; gx.textBaseline = 'middle'; gx.fillStyle = '#fff';
+  for (let c = 0; c < 128; c++) { if (c < 33 || c > 126) { out.push(null); continue; }
+    gx.clearRect(0, 0, cw, ch); gx.fillText(String.fromCharCode(c), cw / 2, ch / 2 + 0.5);
+    const d = gx.getImageData(0, 0, cw, ch).data, a = new Uint8Array(cw * ch); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3]; out.push(a); }
+  return out;
+}
 function resize() {
   [PW, PH] = $('format').value.split('x').map(Number); CW = +$('cell').value; CH = CW * 2;
   W = Math.floor(PW / CW); H = Math.floor(PH / CH); OX = (PW - W * CW) >> 1; OY = (PH - H * CH) >> 1;
   cv.width = PW; cv.height = PH; GLOW.clear();
   depth = new Float32Array(W * H); chr = new Uint8Array(W * H); col = new Float32Array(W * H * 3); emit = new Uint8Array(W * H); halo = new Float32Array(W * H * 3);
   img = ctx.createImageData(PW, PH); px32 = new Uint32Array(img.data.buffer);
-  const g = document.createElement('canvas'); g.width = CW; g.height = CH; const gx = g.getContext('2d', { willReadFrequently: true });
-  gx.font = 'bold ' + Math.round(CH * 0.82) + 'px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
-  gx.textAlign = 'center'; gx.textBaseline = 'middle'; gx.fillStyle = '#fff'; atlas = [];
-  for (let c = 0; c < 128; c++) { if (c < 33 || c > 126) { atlas.push(null); continue; }
-    gx.clearRect(0, 0, CW, CH); gx.fillText(String.fromCharCode(c), CW / 2, CH / 2 + 0.5);
-    const d = gx.getImageData(0, 0, CW, CH).data, a = new Uint8Array(CW * CH); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3]; atlas.push(a); }
+  CW2 = Math.max(4, CW >> 1); CH2 = CW2 * 2; atlas = glyphs(CW, CH); atlas2 = glyphs(CW2, CH2);
   buildCaption();
 }
 function setRamp() { ramp = Array.from($('ramp').value, c => c.charCodeAt(0)); }
 function siteLabel() { const h = location.hostname.replace(/^www\./, '');          // your own domain if you have one; never an auto-generated *.vercel.app address
   return /^https?:$/.test(location.protocol) && h && !/^(localhost|127\.|\[)/.test(h) && !/\.vercel\.app$/.test(h) ? h : SITE; }
 function captionText() { return $('caption').value.trim().toUpperCase(); }
-function textBitmap(lines, rows) {            // draw text with a normal font at grid resolution; each pixel becomes a character
-  const c = document.createElement('canvas'); c.width = W; c.height = rows * lines.length;
+function textBitmap(lines, rows, cols) {      // draw text with a normal font at grid resolution; each pixel becomes a character
+  const c = document.createElement('canvas'); c.width = cols; c.height = rows * lines.length;
   const x = c.getContext('2d', { willReadFrequently: true }), fam = 'px "Arial Black", Impact, "Helvetica Neue", Arial, sans-serif';
-  lines.forEach((s, i) => { let fs = rows * 2 * 0.98; x.setTransform(1, 0, 0, 1, 0, 0); x.font = '900 ' + fs + fam; const w = x.measureText(s).width; if (w > W * 0.94) fs *= W * 0.94 / w;
-    x.setTransform(1, 0, 0, CW / CH, 0, 0); x.font = '900 ' + fs + fam; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff'; x.fillText(s, W / 2, (i + 0.5) * rows * CH / CW); });
-  const d = x.getImageData(0, 0, W, c.height).data, a = new Uint8Array(W * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
-  return { a, rows: c.height };
+  lines.forEach((s, i) => { let fs = rows * 2 * 0.98; x.setTransform(1, 0, 0, 1, 0, 0); x.font = '900 ' + fs + fam; const w = x.measureText(s).width; if (w > cols * 0.94) fs *= cols * 0.94 / w;
+    x.setTransform(1, 0, 0, 0.5, 0, 0); x.font = '900 ' + fs + fam; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff'; x.fillText(s, cols / 2, (i + 0.5) * rows * 2); });
+  const d = x.getImageData(0, 0, cols, c.height).data, a = new Uint8Array(cols * c.height); let x0 = cols, x1 = 0;
+  for (let i = 0; i < a.length; i++) { a[i] = d[i * 4 + 3]; if (a[i] > 76) { const q = i % cols; if (q < x0) x0 = q; if (q > x1) x1 = q; } }
+  return { a, rows: c.height, cols, x0, x1 };
 }
 function captionLines() { const s = captionText(); if (!s) return []; if (s.length <= 16 || !s.includes(' ')) return [s];       // long captions break into two lines at the space nearest the middle
   let b = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (b < 0 || Math.abs(i - s.length / 2) < Math.abs(b - s.length / 2))) b = i; return [s.slice(0, b), s.slice(b + 1)]; }
 function buildCaption() {
-  capBmp = stamp = null; if (!W) return; const s = captionText();
+  capBmp = stamp = null; if (!W) return; const lines = captionLines();
+  if (lines.length) capBmp = textBitmap(lines, Math.max(9, Math.round(Math.min(PW, PH) * (lines.length > 1 ? 0.085 : 0.11) / CH2)), Math.floor(PW / CW2));   // the caption, built from characters half the size of the picture's so it stays easy to read
   const fs = Math.round(Math.min(PW, PH) * 0.043), y = Math.round(PH * (PH > PW ? 0.15 : 0.055)), w = siteLabel().length * fs * 0.62;   // the site address: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
   stamp = { fs, y, r0: Math.max(0, Math.floor((y - fs * 0.85 - OY) / CH)), r1: Math.min(H - 1, Math.floor((y + fs * 0.85 - OY) / CH)), x0: Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW) - 1), x1: Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW) + 1) };
 }
@@ -1002,11 +1007,10 @@ function frame(t) {
     (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : fly ? 'airspeed ' + (Math.abs(speedV) * 420).toFixed(0).padStart(3, '0') + ' kt' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs,
     'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas')];                 // drawn by paint() in a real font, so a phone can read them
   const capT = intro ? 12 * u : 5;
-  const capL = captionLines(), mm = Math.min(PW, PH), cfs = capL.length ? Math.round(Math.min(mm * (capL.length > 1 ? 0.07 : 0.085), PW * 0.92 / (Math.max(...capL.map(l => l.length)) * 0.6))) : 0;
-  const hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = cfs * 1.2 * capL.length, capY = Math.min(hudTop - cfs * 0.4, PH > PW ? PH * 0.8 - cfs * 0.3 : 1e9) - capH + cfs * 0.6;   // above the status lines, and above Instagram's reply bar on tall videos
-  S.capText = { lines: capL, fs: cfs, y: capY, n: t > capT ? Math.floor((t - capT) * 18) : 0 };                                   // the caption types itself in; paint() draws it
-  if (S.capText.n > 0) { const w = Math.max(...capL.map(l => l.length)) * 0.6 * cfs + cfs, c0 = Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW)), c1 = Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW));
-    for (let y = Math.max(0, Math.floor((capY - cfs * 0.7 - OY) / CH)); y <= Math.min(H - 1, Math.floor((capY + capH - cfs * 0.5 - OY) / CH)); y++) for (let x = c0; x <= c1; x++) { const i = y * W + x; chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; } }
+  const mm = Math.min(PW, PH), hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = capBmp ? capBmp.rows * CH2 : 0, capY = Math.round(Math.min(hudTop - mm * 0.025, PH > PW ? PH * 0.8 : 1e9) - capH);   // above the status lines, and above Instagram's reply bar on tall videos
+  S.capText = capBmp && t > capT ? { y: capY, upTo: Math.min(capBmp.x1 + 1, Math.ceil((t - capT) * capBmp.cols / 2)) } : null;                    // wiped on from the left; paint() draws it
+  if (S.capText && S.capText.upTo > capBmp.x0) { const c0 = Math.max(0, Math.floor((capBmp.x0 * CW2 - OX) / CW) - 1), c1 = Math.min(W - 1, Math.ceil((S.capText.upTo * CW2 - OX) / CW));
+    for (let y = Math.max(0, Math.floor((capY - OY) / CH)); y <= Math.min(H - 1, Math.floor((capY + capH - OY) / CH)); y++) for (let x = c0; x <= c1; x++) { const i = y * W + x; chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; } }
   if (pr) {                                                                                           // keep the code panel's rows empty: paint() writes the code there
     for (let i = base * W; i < cells; i++) { chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; }
   }
@@ -1022,7 +1026,7 @@ function loadCode() {                        // colour this page's own script so
 loadCode();
 
 // ================================================================ DRAW THE GRID ONTO THE CANVAS
-const GLOW = new Map(), bokehP = new Float32Array(12 * 5); let BOKEH = null; { const RB = rng(31); for (let i = 0; i < bokehP.length; i++) bokehP[i] = RB(); }
+const GLOW = new Map(), bokehP = new Float32Array(12 * 5); let BOKEH = null, CAPGLOW = null; { const RB = rng(31); for (let i = 0; i < bokehP.length; i++) bokehP[i] = RB(); }
 function glowSprite(r, g, b, R, a, core) {    // a soft round glow: full strength out to `core` of the radius, then fading to nothing
   const c = document.createElement('canvas'); c.width = c.height = 2 * R; const x = c.getContext('2d'), gr = x.createRadialGradient(R, R, 0, R, R, R), q = 'rgba(' + r + ',' + g + ',' + b + ',';
   gr.addColorStop(0, q + a + ')'); gr.addColorStop(core, q + a * (core > 0.5 ? 1 : 0.4) + ')'); gr.addColorStop(1, q + '0)'); x.fillStyle = gr; x.fillRect(0, 0, 2 * R, 2 * R); return c; }
@@ -1042,6 +1046,11 @@ function paint() {
       for (let x = 0; x < CW; x++, o += 4, k++) { const al = a[k]; if (!al) continue; const f = al / 255;
         data[o] = b0 + (r - b0) * f; data[o + 1] = b1 + (gg - b1) * f; data[o + 2] = b2 + (b - b2) * f; } }
   }
+  if (S.capText && capBmp) { const c = capBmp, yb = S.capText.y, n2 = ramp.length - 1;                     // the caption: gold, made of small characters
+    for (let y = 0; y < c.rows; y++) for (let x = c.x0; x < S.capText.upTo; x++) { const a = Math.min(1, c.a[y * c.cols + x] / 255 * 2.4); if (a < 0.3) continue;
+      const gl = atlas2[ramp[Math.max(1, Math.min(n2, Math.round(a * n2)))]]; if (!gl) continue; const q = (0.5 + 0.5 * a) * 255, x0 = x * CW2, y0 = yb + y * CH2;
+      for (let yy = 0; yy < CH2; yy++) { let o = ((y0 + yy) * PW + x0) * 4, k = yy * CW2; for (let xx = 0; xx < CW2; xx++, o += 4, k++) { const al = gl[k]; if (!al) continue; const f = al / 255;
+        data[o] = BG[0] + (q - BG[0]) * f; data[o + 1] = BG[1] + (q * .86 - BG[1]) * f; data[o + 2] = BG[2] + (q * .46 - BG[2]) * f; } } } }
   ctx.putImageData(img, 0, 0);
   const T = S.tt || 0, m = Math.min(PW, PH), top = panelBase < H ? OY + panelBase * CH : PH;
   // light: a few soft out-of-focus glows drifting in the dark, then a real glow on every bulb
@@ -1053,12 +1062,12 @@ function paint() {
   for (let i = 0, n = W * H; i < n; i++) if (emit[i]) { const j = i * 3, r = Math.min(7, col[j] * 7 + .5 | 0), g = Math.min(7, col[j + 1] * 7 + .5 | 0), b = Math.min(7, col[j + 2] * 7 + .5 | 0), key = r << 6 | g << 3 | b;
     let sp = GLOW.get(key); if (!sp) { sp = glowSprite(r * 36, g * 36, b * 36, GR, 0.34, 0.3); GLOW.set(key, sp); }
     ctx.drawImage(sp, OX + (i % W) * CW + CW / 2 - GR, OY + ((i / W) | 0) * CH + CH / 2 - GR); }
+  if (S.capText && capBmp) { const c = capBmp, R = CW2 * 8; if (!CAPGLOW) CAPGLOW = glowSprite(255, 186, 64, 48, 0.1, 0.3);                // and a warm glow around its letters
+    for (let y = 1; y < c.rows; y += 3) for (let x = c.x0; x < S.capText.upTo; x += 4) if (c.a[y * c.cols + x] > 150) ctx.drawImage(CAPGLOW, x * CW2 - R, S.capText.y + y * CH2 - R, 2 * R, 2 * R); }
   ctx.restore();
   // words people need to read are drawn in a real font: the site address, the status lines, the code
   ctx.textBaseline = 'middle';
   if (stamp) { ctx.font = '700 ' + stamp.fs + 'px ' + MONO; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(244,246,255,0.95)'; ctx.fillText(siteLabel(), PW / 2, stamp.y); }
-  if (S.capText && S.capText.n > 0) { const c = S.capText; let left = c.n; ctx.font = '800 ' + c.fs + 'px ' + MONO; ctx.textAlign = 'left'; ctx.fillStyle = '#ffd66b'; ctx.shadowColor = 'rgba(255,196,72,0.6)'; ctx.shadowBlur = c.fs * 0.35;
-    c.lines.forEach((l, i) => { if (left > 0) ctx.fillText(l.slice(0, left), PW / 2 - ctx.measureText(l).width / 2, c.y + i * c.fs * 1.2); left -= l.length; }); ctx.shadowBlur = 0; }
   ctx.textAlign = 'left';
   if (S.hud) { const fs = Math.round(m * 0.024), lh = Math.round(fs * 1.45), pad = Math.round(fs * 0.8), y0 = top - lh * 3 - pad * 0.6; ctx.font = fs + 'px ' + MONO;
     const w = Math.max(...S.hud.map(h => ctx.measureText(h).width)); ctx.fillStyle = 'rgba(7,9,20,0.62)'; ctx.fillRect(0, y0 - pad * 0.4, w + pad * 2, lh * 3 + pad);
