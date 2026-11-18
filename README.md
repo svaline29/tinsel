@@ -9,7 +9,7 @@ It runs entirely in the browser: one HTML file, no build step, no server, nothin
 
 ## What you can do
 
-- Pick a shape: any word, your own photo (the lights trace its outlines and the picture fills in behind them; it never leaves your device), a snow globe with your place or name, a house with lit windows and chimney smoke, five car body styles, a steam train, a jet, a sleigh, tree, rocket, snowman, gift, or your own `.glb` / `.obj` / `.stl`
+- Pick a shape: any word, your own photo (the lights trace its outlines and the picture fills in behind them; it never leaves your device), a snow globe with your place or name, a house with lit windows and chimney smoke, a nutcracker, five car body styles, a steam train, a jet, a sleigh, tree, rocket, snowman, gift, or your own `.glb` / `.obj` / `.stl`
 - Lights that follow the model's edges (roofline, sills, wheel arches), or a wrapped string, or scattered bulbs
 - Three scenes: driving through snow (ground, snowfall and pines slide past, wheels turn), flying through snow, or spinning on ice with a reflection
 - A build-up intro, a caption, and the page's own source code scrolling underneath
