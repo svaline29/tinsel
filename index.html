@@ -854,7 +854,7 @@ function buildLights(d, o) {
 }
 
 // ================================================================ STATE
-const S = { song: '', music: '', kind: '', cellWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const S = { song: '', music: '', kind: '', cellWas: null, fmtWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
 let tileOn = 0, soft = 0, tint, depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
@@ -1341,24 +1341,24 @@ function plusThumb(c) { const g = c.getContext('2d'), w = c.width, h = c.height;
   g.setLineDash([]); g.lineWidth = 4; g.beginPath(); g.moveTo(w / 2, h * .36); g.lineTo(w / 2, h * .64); g.moveTo(w / 2 - h * .14, h / 2); g.lineTo(w / 2 + h * .14, h / 2); g.stroke(); }
 function useText(str, live) {
   str = ((str || '').trim().slice(0, 14) || 'NOEL').toUpperCase();
-  try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; fineCells(false); S.preset = 'text'; S.kind = ''; if (first) $('scene').value = 'spin'; markChips();
+  try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; fineCells(false); goTall(false); S.preset = 'text'; S.kind = ''; if (first) $('scene').value = 'spin'; markChips();
     setModel(raw, str.toLowerCase(), first ? { topper: false, repaint: true, paint: '#d41a1f', mode: 'outline', bulbs: 150 } : null); buildCaption();
     if (live) S.t0 = performance.now() - 4000; }                           // while typing, skip the build-up so the letters show straight away
   catch (e) { setStatus(e.message || String(e), true); }
 }
 const RAW = {};
 const fineCells = on => { if (on && S.cellWas == null) { S.cellWas = $('cell').value; if (+S.cellWas > 5) setVal('cell', '5'); } else if (!on && S.cellWas != null) { setVal('cell', S.cellWas); S.cellWas = null; } };   // a photo needs the smallest characters to show a face; put the size back afterwards
-const goTall = () => { if ($('format').value === '1920x1080') setVal('format', '1080x1920'); };      // a photo and the globe are upright things: they start in the tall shape, which they fill
+const goTall = on => { if (on) { if ($('format').value === '1920x1080') { S.fmtWas = '1920x1080'; setVal('format', '1080x1920'); } } else if (S.fmtWas) { if ($('format').value === '1080x1920') setVal('format', S.fmtWas); S.fmtWas = null; } };   // a photo and the globe are upright things: they start in the tall shape, which they fill, and the wide shape comes back afterwards
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
   const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; fineCells(false); S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
-  if (p.word && was !== p) goTall();
+  if (p.word) { if (was !== p) goTall(true); } else goTall(false);
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
 async function loadPhoto(file) {
   try { setStatus('Reading your photo ...'); const url = URL.createObjectURL(file), im = new Image();
     await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('That picture could not be opened. Try a .jpg or .png.')); im.src = url; });
-    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(); fineCells(true); } markChips();
+    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(true); fineCells(true); } markChips();
     setModel(raw, 'my photo', first ? { topper: false, repaint: false, mode: 'outline', bulbs: 130 } : null); buildCaption(); track('photo_used', {});
   } catch (e) { setStatus(e.message || String(e), true); }
 }
@@ -1372,7 +1372,7 @@ async function loadFiles(files) {
     const mesh = glb ? await parseGLB(await glb.arrayBuffer()) : obj ? parseOBJ(await obj.text(), mtl ? await mtl.text() : null) : parseSTL(await stl.arrayBuffer());
     if (mesh.T.length < 9) throw new Error('No triangles found in that file.');
     const c = outerShell(sampleTriangles(mesh, 300000, rng(7)), 130000, rng(8));
-    fineCells(false); S.preset = ''; S.kind = 'file'; markChips();
+    fineCells(false); goTall(false); S.preset = ''; S.kind = 'file'; markChips();
     const segs = findCreases(mesh.T, c, rng(9));
     setModel({ P: c.P, N: c.N, n: c.n, tint: c.tint, paint: pickPaintable(c), segs, zUp: !!stl }, main.name, { topper: false, repaint: false, mode: segs ? 'outline' : 'spiral' }); buildCaption();   // STL files are usually Z-up
     track('model_upload', { type: main.name.split('.').pop().toLowerCase() });
