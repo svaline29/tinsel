@@ -130,6 +130,7 @@
   #linkbox { flex:1 1 100%; order:-2; font-size:12px; color:var(--hot); }
   #status { flex:1 1 100%; order:-3; margin:0; color:var(--dim); font-size:12px; } #status:empty { display:none; }
   #status.err { color:var(--red); }
+  #inapp { flex:1 1 100%; order:-4; margin:0; color:var(--hot); font-size:12px; }
 
   @media (max-width:860px) {
     main { display:block; height:auto; }
@@ -245,6 +246,7 @@
     <p class="note">Free. Nothing is uploaded: it all runs in your browser. Keep this tab open and visible while a video records.</p>
 
     <div id="actions">
+      <p id="inapp" hidden>You are inside an app's built-in browser, which usually cannot save videos. Open the menu (the three dots) and choose to open this page in your own browser. Send a link works here.</p>
       <input id="linkbox" type="text" readonly hidden aria-label="Your link">
       <p id="status"></p>
       <button id="rec" class="go">Download the video</button>
@@ -877,8 +879,8 @@ function captionLines() { const s = captionText(); if (!s) return []; if (s.leng
 function buildCaption() {
   capBmp = stamp = null; if (!W) return; const lines = captionLines();
   if (lines.length) capBmp = textBitmap(lines, Math.max(9, Math.round(Math.min(PW, PH) * (lines.length > 1 ? 0.085 : 0.11) / CH2)), Math.floor(PW / CW2));   // the caption, built from characters half the size of the picture's so it stays easy to read
-  const fs = Math.round(Math.min(PW, PH) * 0.05), y = Math.round(PH * (PH > PW ? 0.15 : 0.06)), w = siteLabel().length * fs * 0.62;   // the site address: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
-  stamp = { fs, y, r0: Math.max(0, Math.floor((y - fs * 0.85 - OY) / CH)), r1: Math.min(H - 1, Math.floor((y + fs * 0.85 - OY) / CH)), x0: Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW) - 1), x1: Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW) + 1) };
+  const fs = Math.round(Math.min(PW, PH) * 0.056), y = Math.round(PH * (PH > PW ? 0.158 : 0.09)), w = (siteLabel().length + 3) * fs * 0.62;   // the call to action: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
+  stamp = { fs, y, r0: Math.max(0, Math.floor((y - fs * 1.75 - OY) / CH)), r1: Math.min(H - 1, Math.floor((y + fs * 0.8 - OY) / CH)), x0: Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW) - 1), x1: Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW) + 1) };
 }
 
 // ================================================================ ONE FRAME: FILL THE CHARACTER GRID
@@ -1067,7 +1069,12 @@ function paint() {
   ctx.restore();
   // words people need to read are drawn in a real font: the site address, the status lines, the code
   ctx.textBaseline = 'middle';
-  if (stamp) { ctx.font = '700 ' + stamp.fs + 'px ' + MONO; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(244,246,255,0.95)'; ctx.fillText(siteLabel(), PW / 2, stamp.y); }
+  if (stamp) { const full = '* ' + siteLabel(), n = Math.max(0, Math.min(full.length, Math.floor((T - 0.3) * 22)));                          // "make your own at * wrapinlights.com", typed like a prompt, cursor left blinking
+    ctx.font = '800 ' + stamp.fs + 'px ' + MONO; ctx.textAlign = 'left'; const adv = ctx.measureText('M').width, x0 = PW / 2 - adv * (full.length + 0.7) / 2;
+    ctx.shadowColor = 'rgba(255,255,255,0.4)'; ctx.shadowBlur = stamp.fs * 0.3;
+    if (n > 0) { ctx.fillStyle = '#ffd66b'; ctx.fillText('*', x0, stamp.y); } if (n > 2) { ctx.fillStyle = 'rgba(246,248,255,0.97)'; ctx.fillText(full.slice(2, n), x0 + adv * 2, stamp.y); }
+    ctx.shadowBlur = 0; if (n < full.length || (T * 1.2) % 1 < 0.55) { ctx.fillStyle = '#ffd66b'; ctx.fillRect(x0 + adv * n + adv * 0.12, stamp.y - stamp.fs * 0.52, adv * 0.55, stamp.fs * 1.04); }
+    ctx.font = '600 ' + Math.round(stamp.fs * 0.46) + 'px ' + MONO; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(176,188,216,' + (Math.min(1, Math.max(0, T - 0.05) * 3) * 0.95).toFixed(2) + ')'; ctx.fillText('make your own at', PW / 2, stamp.y - stamp.fs * 0.98); }
   ctx.textAlign = 'left';
   if (S.hud) { const fs = Math.round(m * 0.024), lh = Math.round(fs * 1.45), pad = Math.round(fs * 0.8), y0 = top - lh * 3 - pad * 0.6; ctx.font = fs + 'px ' + MONO;
     const w = Math.max(...S.hud.map(h => ctx.measureText(h).width)); ctx.fillStyle = 'rgba(7,9,20,0.62)'; ctx.fillRect(0, y0 - pad * 0.4, w + pad * 2, lh * 3 + pad);
@@ -1289,6 +1296,7 @@ addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointe
 // ================================================================ START
 // A phone starts with the tall phone shape; anything else starts wide. A link carries a size only if its maker changed it, so each viewer gets the shape that fits their screen.
 const PHONE = /iPhone|iPod|Android.+Mobile|Windows Phone/i.test(navigator.userAgent) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600);
+if (/Instagram|FBAN|FBAV|FB_IAB|TikTok|musical_ly|BytedanceWebview|Snapchat/i.test(navigator.userAgent)) { $('inapp').hidden = false; track('in_app_browser', {}); }
 $('format').value = PHONE ? '1080x1920' : '1920x1080'; if (PHONE) $('cell').value = '8';      // and characters big enough to see on a phone
 for (const id of SHARE_IDS) DEFAULTS[id] = val(id);
 const start = new URLSearchParams(location.hash.slice(1));
