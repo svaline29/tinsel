@@ -113,6 +113,7 @@
 
   /* music */
   #spBox { min-height:80px; border-radius:12px; overflow:hidden; background:#181818; color:var(--dim); font-size:12px; line-height:80px; text-align:center; }
+  #spBox:empty, #spBox:empty + .note { display:none; }
   #spBox iframe { display:block; width:100%; height:80px; border:0; border-radius:12px; }
 
   /* everything else you can change: open by default */
@@ -201,12 +202,18 @@
     <h2>Size</h2>
     <div class="seg" id="sizes"></div>
 
-    <h2>Music</h2>
-    <div class="btns" id="songs"></div>
-    <label class="field" id="spRow" hidden>Spotify song link<input id="spLink" type="text" placeholder="paste a Spotify song link, press Enter" autocomplete="off" spellcheck="false"></label>
+    <h2>Sound</h2>
+    <div class="btns" id="tunes"></div>
+    <p class="note" id="tuneNote">The tune goes into the video you download, and the lights keep time with it.</p>
+    <details class="help" id="popBox"><summary>Want a pop song, like Last Christmas?</summary>
+      A pop song cannot go into the video from here. Pick one to time the lights to it and hear a preview, then add the song with the music button in Instagram or TikTok when you post.
+      <div class="btns" id="songs"></div>
+      <label class="field" id="spRow" hidden>Spotify song link<input id="spLink" type="text" placeholder="paste a Spotify song link, press Enter" autocomplete="off" spellcheck="false"></label>
+    </details>
     <div id="musicBox" hidden>
+      <button id="soundOn" class="go" hidden>Tap for sound</button>
       <div id="spBox"></div>
-      <p class="note">Plays from Spotify: the whole song if you are signed in to Spotify in this browser, a 30-second preview if not. If it stays quiet, press play on the player. Downloaded videos have no sound: add the song in Instagram or TikTok when you post.</p>
+      <p class="note" id="spNote">This only previews the song here. Your video will be silent and timed to it: add the song with the music button in Instagram or TikTok when you post.</p>
     </div>
 
     <h2>Words</h2>
@@ -223,7 +230,7 @@
       <label class="row">Turns<input id="turns" type="range" min="2" max="26" step="1" value="10"><output></output></label>
       <label class="row two">Wrap around<select id="axis"><option value="auto">Longest side</option><option value="y">Its height</option><option value="len">Its length</option></select></label>
       <label class="row">Blink<input id="blink" type="range" min="0" max="12" step="0.5" value="5"><output></output></label>
-      <label class="row two">Pulse to music<select id="bpm"><option value="0">Off</option><option value="90">90 beats a minute</option><option value="100">100</option><option value="107">107 (Last Christmas)</option><option value="120">120</option><option value="128">128</option><option value="140">140</option><option value="150">150 (All I Want for Christmas Is You)</option></select></label>
+      <label class="row two">Pulse to music<select id="bpm"><option value="0">Off</option><option value="90">90 beats a minute</option><option value="100">100</option><option value="107">107 (Last Christmas)</option><option value="120">120</option><option value="128">128</option><option value="132">132</option><option value="140">140</option><option value="150">150 (All I Want for Christmas Is You)</option><option value="180">180</option></select></label>
       <label class="chk"><input id="topper" type="checkbox"> Star on top</label>
 
       <h2>Motion and scene</h2>
@@ -251,6 +258,7 @@
       <p id="status"></p>
       <button id="rec" class="go">Download the video</button>
       <button id="shareVid" class="go alt" hidden>Share the video</button>
+      <button id="capCopy" hidden>Copy a caption</button>
       <button id="send" class="go alt">Send a link</button>
     </div>
   </aside>
@@ -795,7 +803,7 @@ function buildLights(d, o) {
 }
 
 // ================================================================ STATE
-const S = { raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const S = { song: '', music: '', raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
 let depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
@@ -909,7 +917,7 @@ function frame(t) {
   const rollA = fly && $('acro').checked && rb >= 0 && rph < 3 ? TAU * rq * rq * (3 - 2 * rq) : 0;                                         // a full roll every eight beats, the first one as the caption lands
   const M = turn(yaw, fly ? 0.75 + 0.18 * Math.sin(0.8 * t) + 0.05 * Math.sin(1.9 * t) + rollA : 0, fly ? (tall ? 0.6 : 0.3) + 0.06 * Math.sin(0.6 * t + 1) : 0, d.fwdAngle);   // flying: it climbs across the picture with its top turned towards you
   const fwx = Math.cos(d.fwdAngle), fwz = Math.sin(d.fwdAngle), nX = M[0] * fwx + M[2] * fwz, nY = M[3] * fwx + M[5] * fwz, nZ = M[6] * fwx + M[8] * fwz;   // which way the nose points
-  const bpm = +$('bpm').value, beat = bpm ? 0.92 + 0.6 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights stay lit and flash brighter on every beat (the first beat is at time zero)
+  const bpm = +$('bpm').value, pe = S.song && TUNES[S.song].meter === 3 ? 3 : 1, bph = t / (u * pe), bd = Math.abs(bph - Math.round(bph)) * pe, beat = bpm ? 0.92 + 0.6 * Math.exp(-18 * bd * bd) : 1;   // lights stay lit and flash brighter on the beat (in waltz time, once a bar); the first beat is at time zero
   const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
   depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0);
 
@@ -1092,11 +1100,76 @@ function paint() {
 }
 let ema = 16, ticks = 0;
 function loop() {
-  if (S.dense) { const a = performance.now(), t = (a - S.t0) / 1000; frame(t); paint(); ema += (performance.now() - a - ema) * 0.08;
+  if (S.dense) { const a = performance.now(), t = (a - S.t0) / 1000; auTick(t); frame(t); paint(); ema += (performance.now() - a - ema) * 0.08;
     if (++ticks % 40 === 0) { if (ema > 30 && S.cap > 12000) S.cap = Math.max(12000, Math.min(S.cap, +$('points').value) * 0.8); else if (ema < 13 && S.cap < 1e8) S.cap *= 1.2; }   // slow device: draw fewer points
     if (S.viewer && t > 7 && $('cta').hidden) $('cta').hidden = false; }
   requestAnimationFrame(loop);
 }
+
+// ================================================================ SOUND
+// Carols old enough that anyone may use them, played by the page itself. That is what lets the sound go into the video and the lights keep exact time with it.
+const notes = str => str.trim().split(/\s+/).map(q => { const [p, d] = q.split(':'); return [p, +d]; });       // 'E4:1 G4:.5' means E4 for one beat, then G4 for half a beat; '-' is a rest
+const hz = n => { const m = /^([A-G])(#|b)?(\d)$/.exec(n), k = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); return 440 * Math.pow(2, (k + 12 * (+m[3] + 1) - 69) / 12); };
+const CHORD = { C: ['C3', 'E4', 'G4', 'C5'], F: ['F3', 'F4', 'A4', 'C5'], G: ['G3', 'D4', 'G4', 'B4'], D: ['D3', 'D4', 'F#4', 'A4'] };       // bass note, then three notes to strum
+const DECK = 'G4:1.5 F4:.5 E4:1 D4:1 C4:1 D4:1 E4:1 C4:1 D4:.5 E4:.5 F4:.5 D4:.5 E4:1.5 D4:.5 C4:1 B3:1 C4:2 ', JING = 'E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 ';
+const TUNES = {
+  jingle: { label: 'Jingle Bells', bpm: 120, meter: 4, chords: 'C C C C F C D G C C C C F C G C',
+    melody: JING + 'E4:1 D4:1 D4:1 E4:1 D4:2 G4:2 ' + JING + 'G4:1 G4:1 F4:1 D4:1 C4:4' },
+  deck: { label: 'Deck the Halls', bpm: 132, meter: 4, chords: 'C C G C C C G C G C G G C C F C',
+    melody: DECK + DECK + 'D4:1.5 E4:.5 F4:1 D4:1 E4:1.5 F4:.5 G4:1 D4:1 E4:.5 F#4:.5 G4:1 A4:.5 B4:.5 C5:1 B4:1 A4:1 G4:2 G4:1.5 F4:.5 E4:1 D4:1 C4:1 D4:1 E4:1 C4:1 A4:.5 A4:.5 A4:.5 A4:.5 G4:1.5 F4:.5 E4:1 D4:1 C4:2' },
+  bells: { label: 'Carol of the Bells', bpm: 180, meter: 3 },
+};
+for (const T of Object.values(TUNES)) {                                    // turn each tune into a list of sounds: [beat, kind, pitch, loudness]
+  const ev = []; let b = 0;
+  if (T.melody) { for (const [p, d] of notes(T.melody)) { if (p !== '-') ev.push([b, 'bell', hz(p) * 2, 0.5]); b += d; }
+    T.chords.split(' ').forEach((c, bar) => { const q = CHORD[c], t = bar * 4; ev.push([t, 'bass', hz(q[0]), 0.5], [t + 2, 'bass', hz(q[0]) * 1.5, 0.36]);
+      for (const off of [1, 3]) for (let i = 1; i < 4; i++) ev.push([t + off, 'pluck', hz(q[i]), 0.1]);
+      for (let k = 0; k < 8; k++) ev.push([t + k / 2, 'shake', 0, k % 2 ? 0.05 : 0.11]); }); }
+  else { const ring = [['Bb4', 0], ['A4', 1], ['Bb4', 1.5], ['G4', 2]], low = ['G2', 'F2', 'Eb2', 'D2'], high = ['D5', 'C5', 'Bb4', 'A4'];      // the four-note bell figure, round and round, with more joining in every four bars
+    for (let bar = 0; bar < 16; bar++) { const t = bar * 3; for (const [p, o] of ring) { ev.push([t + o, 'bell', hz(p) * 2, 0.42]); if (bar >= 8) ev.push([t + o, 'bell', hz(p) * 4, 0.13]); }
+      if (bar >= 4) ev.push([t, 'bass', hz(low[bar % 4]) * 2, 0.6]); if (bar >= 12) ev.push([t, 'bell', hz(high[bar % 4]) * 2, 0.36]);
+      if (bar >= 8) for (let k = 0; k < 3; k++) ev.push([t + k, 'shake', 0, k ? 0.05 : 0.1]); }
+    b = 48; }
+  T.len = b; T.grid = new Map(); for (const e of ev) { const i = Math.round(e[0] * 4); if (!T.grid.has(i)) T.grid.set(i, []); T.grid.get(i).push(e); }
+}
+const AU = { ctx: null, bus: null, gen: null, rec: null, next: 0, last: 0, hiss: new WeakMap() };
+function auBus(ctx) { const g = ctx.createGain(), c = ctx.createDynamicsCompressor(); g.gain.value = 0.6; g.connect(c); return { in: g, out: c }; }
+function auPlay(ctx, to, e, at) {            // one sound at one moment
+  const tone = (f, type, vol, decay) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.006); g.gain.exponentialRampToValueAtTime(0.0008, at + decay); o.connect(g); g.connect(to); o.start(at); o.stop(at + decay + 0.05); };
+  const [, kind, f, v] = e;
+  if (kind === 'bell') { tone(f, 'sine', v, 1.4); tone(f * 2, 'triangle', v * 0.2, 0.7); tone(f * 3.01, 'sine', v * 0.16, 0.35); }       // a music box
+  else if (kind === 'bass') tone(f, 'triangle', v, 0.55);
+  else if (kind === 'pluck') tone(f, 'triangle', v, 0.3);
+  else { let buf = AU.hiss.get(ctx); if (!buf) { buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate); const d = buf.getChannelData(0), r = rng(4); for (let i = 0; i < d.length; i++) d[i] = 2 * r() - 1; AU.hiss.set(ctx, buf); }   // sleigh bells: a short hiss, kept bright
+    const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(); n.buffer = buf; fl.type = 'bandpass'; fl.frequency.value = 7600; fl.Q.value = 1.4;
+    g.gain.setValueAtTime(v, at); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.09); n.connect(fl); fl.connect(g); g.connect(to); n.start(at); n.stop(at + 0.12); }
+}
+function auWake() { if (!S.song) return false; const C = window.AudioContext || window.webkitAudioContext; if (!C) return false;        // browsers only allow sound after a tap
+  if (!AU.ctx) { AU.ctx = new C(); AU.bus = auBus(AU.ctx); AU.bus.out.connect(AU.ctx.destination); }
+  if (AU.ctx.state !== 'running') AU.ctx.resume(); return true; }
+function auFresh(t) { const T = TUNES[S.song]; if (AU.gen) { const old = AU.gen; old.gain.setTargetAtTime(0, AU.ctx.currentTime, 0.02); setTimeout(() => old.disconnect(), 300); }   // the picture restarted: drop what was queued and start the tune again in step
+  AU.gen = AU.ctx.createGain(); AU.gen.connect(AU.bus.in); AU.next = T ? Math.max(0, Math.ceil(t * T.bpm / 60 * 4)) : 0; }
+function auTick(t) {                         // called every frame: queue the sounds due in the next third of a second
+  const T = TUNES[S.song]; if (!T || !AU.ctx || AU.ctx.state !== 'running') { AU.last = t; return; }
+  if (!AU.gen || t < AU.last - 0.05 || t > AU.last + 1) auFresh(t); AU.last = t;
+  const spq = 60 / T.bpm / 4, until = (t + 0.3) / spq, L = T.len * 4;
+  for (; AU.next < until; AU.next++) { const g = T.grid.get(AU.next % L); if (g) for (const e of g) auPlay(AU.ctx, AU.gen, e, AU.ctx.currentTime + Math.max(0, AU.next * spq - t)); }
+}
+async function renderSound(key, secs) {      // the same tune as a sound file, for making a video frame by frame
+  const T = TUNES[key], ctx = new OfflineAudioContext(2, Math.ceil(secs * 44100), 44100), bus = auBus(ctx); bus.out.connect(ctx.destination);
+  const spq = 60 / T.bpm / 4, L = T.len * 4; for (let i = 0; i * spq < secs; i++) { const g = T.grid.get(i % L); if (g) for (const e of g) auPlay(ctx, bus.in, e, i * spq); }
+  const buf = await ctx.startRendering(), n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)), ch = [buf.getChannelData(0), buf.getChannelData(1)], w = (o, str) => { for (let i = 0; i < str.length; i++) out.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); w(8, 'WAVEfmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, 44100, true); out.setUint32(28, 176400, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 32767, true);
+  let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); return btoa(bin);
+}
+function setSong(key) {                      // '' is silence
+  S.song = TUNES[key] ? key : ''; mark('tunes', S.song || 'off');
+  if (S.song) { if (S.music) setMusic('', false); setVal('bpm', String(TUNES[S.song].bpm)); auWake(); S.t0 = performance.now(); }
+  showSoundButton();
+}
+function showSoundButton() { const need = !!S.song && S.viewer && !(AU.ctx && AU.ctx.state === 'running'); $('soundOn').hidden = !need; $('musicBox').hidden = !(need || S.music); }
 
 // ================================================================ CHOOSING WHAT TO SHOW
 // These events show you whether people share. They go to Vercel Web Analytics, and to Plausible or Umami if you add either.
@@ -1132,7 +1205,8 @@ function spLoad(id, play) { SP.id = id; SP.want = !!(id && play); SP.on = false;
 function setMusic(key, play) {               // key: '' (off), a name from SONGS, or a Spotify song link or id
   const song = SONGS[key], id = song ? song.id : spId(key); S.music = id ? (song ? key : id) : '';
   for (const b of $('songs').children) b.classList.toggle('on', b.dataset.k === (S.music ? (song ? key : 'own') : ($('spRow').hidden ? 'off' : 'own')));
-  $('musicBox').hidden = !id; spLoad(id, play);
+  if (id && S.song) { S.song = ''; mark('tunes', 'off'); if (AU.gen) auFresh(0); }      // a pop song replaces the built-in tune
+  spLoad(id, play); showSoundButton();
   if (song) setVal('bpm', String(song.bpm));                               // lights pulse at the song's tempo
 }
 const mark = (box, k) => { for (const b of $(box).children) { const on = b.dataset.k === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); } };
@@ -1199,21 +1273,27 @@ let lastVideo = null;
 function record() {
   const btn = $('rec'), secs = Math.max(2, Math.min(60, +$('secs').value || 12)), no = 'This browser cannot record video. Send it as a link instead, or try Chrome, Edge or Safari on a computer.';
   if (!window.MediaRecorder || !cv.captureStream) return setStatus(no, true);
-  const mime = ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+  const sound = auWake(), mime = (sound ? ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.640028,opus', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'] : ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']).find(m => MediaRecorder.isTypeSupported(m));
   if (!mime) return setStatus(no, true);
-  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 16e6 }), chunks = [];
+  const stream = cv.captureStream(30); if (sound) { if (!AU.rec) { AU.rec = AU.ctx.createMediaStreamDestination(); AU.bus.out.connect(AU.rec); } for (const tr of AU.rec.stream.getAudioTracks()) stream.addTrack(tr); }   // the tune goes into the video too
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16e6 }), chunks = [];
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   rec.onstop = () => { clearInterval(tick); btn.disabled = false; btn.textContent = 'Download the video';
-    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] }); download(blob, baseName() + '.' + ext);
-    try { lastVideo = new File([blob], baseName() + '.' + ext, { type: blob.type }); $('shareVid').hidden = !(navigator.canShare && navigator.canShare({ files: [lastVideo] })); } catch (e) { lastVideo = null; }
-    setStatus('Saved ' + baseName() + '.' + ext + (S.music ? ' (no sound: add the song in Instagram or TikTok when you post)' : '') + (ext === 'webm' ? '. Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : '. Check your downloads.')); track('video_made', { shape: S.preset || 'upload' }); };
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type: mime.split(';')[0] }), pop = S.music && SONGS[S.music] ? SONGS[S.music].label : S.music ? 'your song' : '';
+    try { lastVideo = new File([blob], baseName() + '.' + ext, { type: blob.type }); } catch (e) { lastVideo = null; }
+    const share = !!(lastVideo && navigator.canShare && navigator.canShare({ files: [lastVideo] })), phone = share && matchMedia('(pointer: coarse)').matches;
+    const tail = pop ? ' It is silent and timed to ' + pop + ': add that song with the music button in Instagram or TikTok.' : sound ? ' The sound is in it.' : '';
+    $('shareVid').hidden = !share; $('shareVid').classList.toggle('alt', !phone); $('shareVid').textContent = phone ? 'Save or share your video' : 'Share the video'; $('capCopy').hidden = false;
+    if (phone) setStatus('Your video is ready. Tap the button to save it to your photos or send it straight to Instagram.' + tail);      // phones: one button opens the share sheet, which can save or post
+    else { download(blob, baseName() + '.' + ext); setStatus('Saved ' + baseName() + '.' + ext + '.' + tail + (ext === 'webm' ? ' Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : ' Check your downloads.')); }
+    track('video_made', { shape: S.preset || 'upload', sound: S.song || (pop ? 'pop' : 'none') }); };
   S.t0 = performance.now(); btn.disabled = true; rec.start(250);
   const tick = setInterval(() => { btn.textContent = 'Recording ' + Math.min(secs, (performance.now() - S.t0) / 1000).toFixed(0) + ' / ' + secs + 's'; }, 200);
   setTimeout(() => rec.state !== 'inactive' && rec.stop(), secs * 1000);
 }
 const DEFAULTS = {}, ALWAYS = ['topper', 'repaint', 'paint'];
 function cardLink() {                        // the link only carries what differs from a fresh page, so it stays short
-  const q = ['v=1', 'm=' + S.preset]; if (S.music) q.push('music=' + S.music);
+  const q = ['v=1', 'm=' + S.preset]; if (S.music) q.push('music=' + S.music); if (S.song !== 'jingle') q.push('song=' + (S.song || 'off'));
   for (const id of SHARE_IDS) if (val(id) !== DEFAULTS[id] || ALWAYS.includes(id)) q.push(id + '=' + encodeURIComponent(val(id)));
   return location.href.split('#')[0] + '#' + q.join('&');
 }
@@ -1255,7 +1335,11 @@ for (const o of $('format').options) { chip('sizes', o.value, '', () => setVal('
 for (const [k, L] of Object.entries(LOOKS)) { chip('looks', k, L.label, () => useLook(k)); const d = document.createElement('span'); d.className = 'dots';
   for (const q of PALETTES[L.palette].slice(0, 3)) { const e = document.createElement('b'); e.style.background = 'rgb(' + q.map(v => Math.round(v * 255)).join(',') + ')'; d.appendChild(e); } $('looks').lastChild.prepend(d); }
 for (const id of ['palette', 'ramp']) $(id).addEventListener('input', markChips);
-chip('songs', 'off', 'Off', () => { $('spRow').hidden = true; setMusic('', false); setVal('bpm', '0'); });
+chip('tunes', 'off', 'Off', () => { setSong(''); if (!S.music) setVal('bpm', '0'); });
+for (const [k, T] of Object.entries(TUNES)) chip('tunes', k, T.label, () => setSong(k));
+$('soundOn').onclick = () => { auWake(); S.t0 = performance.now(); showSoundButton(); setTimeout(showSoundButton, 400); };
+addEventListener('pointerdown', () => { if (S.song && !S.viewer && !(AU.ctx && AU.ctx.state === 'running')) auWake(); });     // the first tap anywhere lets the tune start
+chip('songs', 'off', 'None', () => { $('spRow').hidden = true; setMusic('', false); if (!S.song) setVal('bpm', '0'); });
 for (const [k, sg] of Object.entries(SONGS)) chip('songs', k, sg.label, () => { $('spRow').hidden = true; setMusic(k, true); });
 chip('songs', 'own', 'Any Spotify song', () => { $('spRow').hidden = false; setMusic('', false); $('spLink').focus(); });
 $('spLink').addEventListener('change', e => { if (spId(e.target.value)) { setMusic(e.target.value, true); setVal('bpm', '0'); } else setStatus('That does not look like a Spotify song link. In Spotify: Share, then Copy Song Link.', true); });
@@ -1282,7 +1366,8 @@ $('replay').onclick = $('ctaReplay').onclick = () => { S.t0 = performance.now();
 $('ctaMake').textContent = 'Make your own'; $('ctaMake').onclick = leaveViewer;
 $('file').addEventListener('change', e => { if (e.target.files.length) loadFiles([...e.target.files]); e.target.value = ''; });
 $('rec').onclick = record; $('send').onclick = sendLink; $('shuffle').onclick = shuffle;
-$('shareVid').onclick = () => { if (lastVideo && navigator.share) navigator.share({ files: [lastVideo] }).catch(() => {}); };
+$('shareVid').onclick = () => { if (lastVideo && navigator.share) navigator.share({ files: [lastVideo] }).catch(e => { if (!e || e.name !== 'AbortError') download(lastVideo, lastVideo.name); }); };
+$('capCopy').onclick = () => { const c = 'Made at ' + siteLabel() + ' \u2728 #asciiart #christmaslights #christmas'; (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).then(() => setStatus('Caption copied: paste it when you post.'), () => setStatus(c)); };
 $('linkbox').onclick = e => e.target.select();
 $('png').onclick = () => cv.toBlob(b => download(b, baseName() + '.png'), 'image/png');
 addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag'); });
@@ -1306,6 +1391,7 @@ usePreset(PRESETS[start.get('m')] || start.get('m') === 'text' ? start.get('m') 
 for (const id of SHARE_IDS) if (start.has(id) && !['word', 'from', 'caption'].includes(id)) setVal(id, start.get(id));
 markChips();
 setMusic(start.get('music') || '', false);
+S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? start.get('song') : 'jingle');
 if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 requestAnimationFrame(loop);
