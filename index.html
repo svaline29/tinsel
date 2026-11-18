@@ -67,6 +67,7 @@
   details.help { color:var(--dim); font-size:12px; margin:8px 0 0; }
   details.help > summary { cursor:pointer; }
   details.help ul { margin:6px 0 6px; padding-left:18px; }
+  #about b { color:var(--ink); font-weight:600; } #counts { display:block; margin:0 0 8px; color:var(--hot); font-family:inherit; }
   #modelBox { margin:10px 0 0; padding:10px 12px 4px; border:1px dashed var(--edge); border-radius:11px; }
 
   /* colour */
@@ -179,7 +180,8 @@
       <label class="chk"><input id="twoSided" type="checkbox"> Fix a see-through or inside-out model</label>
     </div>
     <details class="help"><summary>Use your own photo or 3D model</summary>
-      A photo: press "Your photo" and choose any picture. It is turned into lights on your own device and is never uploaded.<br><br>
+      A photo: press "Your photo" and choose any picture. The lights trace its strongest outlines, then the picture fills in behind them. It all happens on your own device: nothing is uploaded.<br><br>
+      For lights that hug a person or a pet exactly, use a cut-out. On an iPhone: in Photos, press and hold the person or pet, tap Share, then Save Image, and choose that picture here.<br><br>
       A 3D model: drop a .glb, .obj or .stl file anywhere on this page, or press "Your 3D file". Places to find one:
       <ul>
         <li><a href="https://sketchfab.com/search?features=downloadable&type=models" target="_blank" rel="noopener">Sketchfab</a>: tick "Downloadable", download as <b>glTF</b>, use the .glb</li>
@@ -253,6 +255,17 @@
       <label class="row two">Seconds<input id="secs" type="number" min="2" max="60" value="12"></label>
     </details>
     <p class="note">Free. Nothing is uploaded: it all runs in your browser. Keep this tab open and visible while a video records.</p>
+    <details class="help" id="about"><summary>About and privacy</summary>
+      <b>What this is.</b> A free toy that draws shapes, words and your own photos in characters and Christmas lights, then makes a video you can post. No account, nothing to install.<br><br>
+      <b>Your photos and files stay with you.</b> Photos and 3D models are turned into lights inside your own browser. They are never uploaded, and the video is made on your device.<br><br>
+      <b>Links.</b> A card link carries your settings and any words you typed inside the link itself, so anyone you send it to can see them.<br><br>
+      <b>What is counted.</b> The host, Vercel, counts page visits without cookies. A simple counter adds one each time a video or a link is made. Neither records who you are, and this site itself sets no cookies.<br><br>
+      <b>Spotify.</b> If you choose to preview a pop song, Spotify's own player loads from Spotify, and Spotify's privacy policy applies to it.<br><br>
+      <b>Using the site.</b> Videos you make are yours to post. Only use photos you have the right to use. The site is provided as it is, with no guarantee.<br><br>
+      The built-in tunes are traditional carols played by this page's own code. This site is not connected with Spotify, Instagram, TikTok or any car maker.<br><br>
+      <span id="counts"></span>
+      <a href="https://github.com/svaline29/tinsel" target="_blank" rel="noopener">Source code and contact</a>
+    </details>
 
     <div id="actions">
       <p id="inapp" hidden>You are inside an app's built-in browser, which usually cannot save videos. Open the menu (the three dots) and choose to open this page in your own browser. Send a link works here.</p>
@@ -672,24 +685,41 @@ function makeHouse(n, r) {                   // a two-storey house in the snow: 
   segPath(B, [[-hw - .08, eave + rise, 0], [hw + .08, eave + rise, 0]], 0, 1, 0); segPath(B, [[-.18, .05, hd], [-.18, .7, hd], [.18, .7, hd], [.18, .05, hd]], 0, 0, 1);
   return finish(B, r, { steam: [[chx, cht + .04, chz]], solo: true });
 }
-function makePhoto(im, n, r) {               // a picture as a shallow relief: lighter parts stand forward, and every point keeps the picture's colour and the character that matches its brightness
-  const sc = Math.min(1, 320 / Math.max(im.width, im.height)), w = Math.max(8, Math.round(im.width * sc)), h = Math.max(8, Math.round(im.height * sc)), big = Math.max(w, h);
+function makePhoto(im, n, r) {               // a picture as a shallow relief: every point keeps the picture's colour and the character that matches its brightness, and the lights run along its strongest outlines
+  const sc = Math.min(1, 320 / Math.max(im.width, im.height)), w = Math.max(8, Math.round(im.width * sc)), h = Math.max(8, Math.round(im.height * sc)), big = Math.max(w, h), N2 = w * h;
   const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
-  const px = x.getImageData(0, 0, w, h).data, L = new Float32Array(w * h), hist = new Uint32Array(256), solid = []; let tot = 0;
-  for (let i = 0; i < w * h; i++) { if (px[i * 4 + 3] < 128) continue; L[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255; hist[Math.round(L[i] * 255)]++; tot++; solid.push(i); }
+  const px = x.getImageData(0, 0, w, h).data, L = new Float32Array(N2), A = new Float32Array(N2), hist = new Uint32Array(256), solid = []; let tot = 0;
+  for (let i = 0; i < N2; i++) { if (px[i * 4 + 3] < 128) continue; A[i] = 1; L[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255; hist[Math.round(L[i] * 255)]++; tot++; solid.push(i); }
   if (!tot) throw new Error('That picture is empty.');
   let lo = 0, hi = 255, acc = 0; for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc < tot * 0.02) lo = i + 1; if (acc < tot * 0.98) hi = i + 1; }       // stretch the contrast so a dull picture still uses every character
   lo /= 255; hi = Math.max(lo + 0.1, hi / 255); const lev = v => Math.min(1, Math.max(0, (v - lo) / (hi - lo)));
-  const T = new Float32Array(w * h), Z = new Float32Array(w * h), Rb = 3;                              // a soft copy for the relief and for finding edges
-  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let a = 0, m = 0; for (let d = -Rb; d <= Rb; d++) { const q = xx + d; if (q >= 0 && q < w) { a += L[y * w + q]; m++; } } T[y * w + xx] = a / m; }
-  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let a = 0, m = 0; for (let d = -Rb; d <= Rb; d++) { const q = y + d; if (q >= 0 && q < h) { a += T[q * w + xx]; m++; } } Z[y * w + xx] = (lev(a / m) - 0.5) * 0.1 * big; }
-  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), tint = new Float32Array(n * 3), lvl = new Uint8Array(n), zat = (xx, y) => Z[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, xx))];
+  const blur = (src, rad) => { const t = new Float32Array(N2), o = new Float32Array(N2);
+    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let a = 0, m = 0; for (let d = -rad; d <= rad; d++) { const q = xx + d; if (q >= 0 && q < w) { a += src[y * w + q]; m++; } } t[y * w + xx] = a / m; }
+    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let a = 0, m = 0; for (let d = -rad; d <= rad; d++) { const q = y + d; if (q >= 0 && q < h) { a += t[q * w + xx]; m++; } } o[y * w + xx] = a / m; } return o; };
+  const soft = blur(L, 3), Z = new Float32Array(N2); for (let i = 0; i < N2; i++) Z[i] = (lev(soft[i]) - 0.5) * 0.1 * big;
+  // ---- the outlines worth lighting: sharp changes of brightness, thinned to lines, joined into chains, and only the long strong chains kept (so no bulbs land on eyes and mouths)
+  const E = blur(blur(L, 2), 1), Ab = tot < N2 ? blur(A, 1) : null; if (Ab) for (let i = 0; i < N2; i++) E[i] += 1.3 * Ab[i];       // a cut-out picture: its own edge counts most of all
+  const mag = new Float32Array(N2), dir = new Uint8Array(N2), thin = new Float32Array(N2), off = [1, w + 1, w, w - 1], vals = [];
+  for (let y = 1; y < h - 1; y++) for (let xx = 1; xx < w - 1; xx++) { const i = y * w + xx, gx = E[i - w + 1] + 2 * E[i + 1] + E[i + w + 1] - E[i - w - 1] - 2 * E[i - 1] - E[i + w - 1], gy = E[i + w - 1] + 2 * E[i + w] + E[i + w + 1] - E[i - w - 1] - 2 * E[i - w] - E[i - w + 1];
+    mag[i] = Math.hypot(gx, gy); dir[i] = ((Math.round(Math.atan2(gy, gx) * 4 / Math.PI) % 4) + 4) % 4; }
+  for (let y = 2; y < h - 2; y++) for (let xx = 2; xx < w - 2; xx++) { const i = y * w + xx, m = mag[i], o = off[dir[i]]; if (m > 0 && m >= mag[i - o] && m > mag[i + o]) { thin[i] = m; vals.push(m); } }
+  vals.sort((p, q) => p - q); const strong = Math.max(0.12, vals[Math.floor(vals.length * 0.86)] || 1), weak = strong * 0.4, seen = new Uint8Array(N2), nb = [1, -1, w, -w, w + 1, w - 1, -w + 1, -w - 1], chains = [];
+  const walk = (i, out) => { for (;;) { let best = -1, bm = weak; for (const o of nb) { const j = i + o; if (!seen[j] && thin[j] > bm) { bm = thin[j]; best = j; } } if (best < 0) return; seen[best] = 1; out.push(best); i = best; } };
+  for (let i = 0; i < N2; i++) if (thin[i] >= strong && !seen[i]) { seen[i] = 1; const f = [], g = []; walk(i, f); walk(i, g); const ch = g.reverse().concat([i], f); let sum = 0; for (const j of ch) sum += thin[j]; if (ch.length >= Math.max(14, 0.09 * Math.hypot(w, h))) chains.push({ ch, score: sum * Math.sqrt(ch.length) }); }
+  chains.sort((p, q) => q.score - p.score); const segs = [], lit = []; let used = 0;
+  for (const { ch } of chains) { if (used > 2.4 * (w + h) || lit.length >= 14) break; used += ch.length; lit.push(ch); let prev = null;
+    for (let j = 0; j < ch.length; j += 2) { let sx = 0, sy = 0, m = 0; for (let d = -3; d <= 3; d++) { const q = ch[Math.min(ch.length - 1, Math.max(0, j + d))]; sx += q % w; sy += Math.floor(q / w); m++; }       // smooth the line a little
+      const pt = [sx / m + 0.5, h - sy / m - 0.5, Z[ch[j]] + 0.02 * big]; if (prev) segs.push(prev[0], prev[1], prev[2], pt[0], pt[1], pt[2], 0, 0, 1); prev = pt; } }
+  const framed = !Ab && used < 0.8 * (w + h);                                                           // nothing clear to trace: hang the lights round the picture instead
+  if (framed) { const zf = 0.07 * big, m = 0.012 * big; for (const [p0, p1, nx, ny] of [[[-m, -m], [w + m, -m], 0, -1], [[w + m, -m], [w + m, h + m], 1, 0], [[w + m, h + m], [-m, h + m], 0, 1], [[-m, h + m], [-m, -m], -1, 0]]) segs.push(p0[0], p0[1], zf, p1[0], p1[1], zf, nx * .3, ny * .3, 1); }
+  // ---- how far each spot is from a lit outline: the picture spreads out from the lights
+  const dist = new Float32Array(N2).fill(1e9); let q = []; if (framed) { for (let xx = 0; xx < w; xx++) q.push(xx, (h - 1) * w + xx); for (let y = 0; y < h; y++) q.push(y * w, y * w + w - 1); } else for (const ch of lit) for (const j of ch) q.push(j);
+  for (const j of q) dist[j] = 0; for (let dd = 1; q.length; dd++) { const nx = []; for (const j of q) { const xx = j % w; for (const o of [1, -1, w, -w]) { const k = j + o; if (k < 0 || k >= N2 || (o === 1 && xx === w - 1) || (o === -1 && xx === 0) || dist[k] <= dd) continue; dist[k] = dd; nx.push(k); } } q = nx; }
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), tint = new Float32Array(n * 3), lvl = new Uint8Array(n), rev = new Uint8Array(n), zat = (xx, y) => Z[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, xx))];
   for (let k = 0; k < n; k++) { const i = solid[Math.floor(r() * solid.length)], xx = i % w, y = Math.floor(i / w), gx = (zat(xx + 1, y) - zat(xx - 1, y)) / 2, gyy = (zat(xx, y + 1) - zat(xx, y - 1)) / 2, l = Math.hypot(gx, gyy, 1);
-    P.set([xx + r(), h - y - r(), Z[i]], k * 3); N.set([-gx / l, gyy / l, 1 / l], k * 3); lvl[k] = Math.round(lev(L[i]) * 255);
+    P.set([xx + r(), h - y - r(), Z[i]], k * 3); N.set([-gx / l, gyy / l, 1 / l], k * 3); lvl[k] = Math.round(lev(L[i]) * 255); rev[k] = Math.round(255 * Math.min(1, 0.82 * Math.min(1, dist[i] / (0.22 * big)) + 0.18 * (((xx >> 1) * 7919 + (y >> 1) * 104729) % 97) / 97));
     const mx = Math.max(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]) + 6, br = 0.22 + 0.78 * Math.pow(lev(L[i]), 0.8); for (let ch = 0; ch < 3; ch++) tint[k * 3 + ch] = (px[i * 4 + ch] + 6) / mx * br; }   // the full colour, as bright as its spot in the picture
-  const segs = [], zf = 0.07 * big, m = 0.012 * big;                                                  // a string of lights all the way round it
-  for (const [p0, p1, nx, ny] of [[[-m, -m], [w + m, -m], 0, -1], [[w + m, -m], [w + m, h + m], 1, 0], [[w + m, h + m], [-m, h + m], 0, 1], [[-m, h + m], [-m, -m], -1, 0]]) segs.push(p0[0], p0[1], zf, p1[0], p1[1], zf, nx * .3, ny * .3, 1);
-  return { P, N, tint, n, lvl, segs: new Float32Array(segs), sway: true };
+  return { P, N, tint, n, lvl, rev, segs: new Float32Array(segs), sway: true, traced: !framed };
 }
 // ---- parts for building things out of simple pieces
 function skin(B, st, smooth, n, r, caps, colour) {            // a lofted body; colour(x, y, z, L) returns [colour, paintable] or nothing to leave a hole
@@ -825,7 +855,7 @@ function normalize(src, zUp, quarter, flip) {
   const trail = (src.trail || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
   const steam = (src.steam || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
   let globe = null; if (src.globe) { const q = [0, 0, 0]; fix(src.globe, q, 0); mv(q, 0); globe = [q[0], q[1], q[2], src.globe[3] * s, (src.globe[4] - lo[1]) * s]; }      // where the glass ball is, and where its snow lies
-  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, globe, steam, solo: !!src.solo, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
+  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, rev: src.rev || null, globe, steam, solo: !!src.solo, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
   if (src.wheel) { d.wheel = src.wheel; const acc = [];
     for (let k = 0; k < n; k++) { const w = src.wheel[k]; if (!w) continue; const q = acc[w - 1] || (acc[w - 1] = [0, 0, 0, 0, -1e9]);
       q[0] += P[k * 3]; q[1] += P[k * 3 + 1]; q[2] += P[k * 3 + 2]; q[3]++; if (P[k * 3 + 1] > q[4]) q[4] = P[k * 3 + 1]; }
@@ -840,20 +870,21 @@ function buildLights(d, o) {
     pts.push(x + gauss(r) * (jit || JIT), y + gauss(r) * (jit || JIT), z + gauss(r) * (jit || JIT), col[0], col[1], col[2], phase, t0, blink); };
   let count = 0, mode = o.mode; if (mode === 'outline' && !d.segs) mode = 'spiral';
   if (mode === 'outline') {                  // walk every edge and hang a bulb wherever there is not one already close by
-    const G = d.segs, ns = G.length / 9, half = d.size[d.la] / 2; let total = 0; for (let k = 0; k < G.length; k += 9) total += Math.hypot(G[k + 3] - G[k], G[k + 4] - G[k + 1], G[k + 5] - G[k + 2]);
-    const place = gap => { const grid = new Map(), out = [], key = (a, b, c) => (a + 600) * 1440000 + (b + 600) * 1200 + c + 600, g2 = gap * gap;
+    const G = d.segs, ns = G.length / 9, half = d.size[d.la] / 2, cum = new Float32Array(ns + 1); let total = 0; for (let k = 0; k < G.length; k += 9) { cum[k / 9] = total; total += Math.hypot(G[k + 3] - G[k], G[k + 4] - G[k + 1], G[k + 5] - G[k + 2]); }
+    const place = gap => { const grid = new Map(), out = [], fr = [], key = (a, b, c) => (a + 600) * 1440000 + (b + 600) * 1200 + c + 600, g2 = gap * gap;
       for (let k = 0; k < G.length; k += 9) { const len = Math.hypot(G[k + 3] - G[k], G[k + 4] - G[k + 1], G[k + 5] - G[k + 2]), st = Math.max(1, Math.ceil(len / (gap * 0.3)));
         for (let i = 0; i <= st; i++) { const f = i / st, x = G[k] + (G[k + 3] - G[k]) * f, y = G[k + 1] + (G[k + 4] - G[k + 1]) * f, z = G[k + 2] + (G[k + 5] - G[k + 2]) * f;
           const cx = Math.floor(x / gap), cy = Math.floor(y / gap), cz = Math.floor(z / gap); let ok = true;
           for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1 && ok; b++) for (let c = -1; c <= 1 && ok; c++) { const cell = grid.get(key(cx + a, cy + b, cz + c)); if (!cell) continue;
             for (let q = 0; q < cell.length; q += 3) if ((cell[q] - x) ** 2 + (cell[q + 1] - y) ** 2 + (cell[q + 2] - z) ** 2 < g2) { ok = false; break; } }
           if (!ok) continue; const kk = key(cx, cy, cz), cell = grid.get(kk); if (cell) cell.push(x, y, z); else grid.set(kk, [x, y, z]);
-          const nl = Math.hypot(G[k + 6], G[k + 7], G[k + 8]) || 1; out.push(x + G[k + 6] / nl * lift, y + G[k + 7] / nl * lift, z + G[k + 8] / nl * lift); } }
-      return out; };
+          const nl = Math.hypot(G[k + 6], G[k + 7], G[k + 8]) || 1; out.push(x + G[k + 6] / nl * lift, y + G[k + 7] / nl * lift, z + G[k + 8] / nl * lift); fr.push((cum[k / 9] + f * len) / total); } }
+      out.fr = fr; return out; };
     let gap = Math.max(0.02, total / o.bulbs), out = place(gap);
     for (let it = 0; it < 5 && Math.abs(out.length / 3 - o.bulbs) > o.bulbs * 0.08; it++) { gap = Math.max(0.015, gap * Math.pow(out.length / 3 / o.bulbs, 0.7)); out = place(gap); }   // tune the spacing until the count is right
-    for (let q = 0; q < out.length; q += 3) { const s = d.sway ? (out[q] + d.size[0] / 2) / d.size[0] : (half - out[q + d.la] * d.fs) / (2 * half);                     // switch on front to back (words: left to right)
-      bulb(out[q], out[q + 1], out[q + 2], pal[count % pal.length], -count * 0.45, o.t0 + o.span * Math.min(1, Math.max(0, s)), o.blink); count++; }
+    const on0 = d.lvl && o.intro ? 0.5 * o.u : o.t0, onSpan = d.lvl ? 7.5 * o.u : o.span;                 // a photo: the lights draw its outlines first, one line after another, and the picture follows
+    for (let q = 0; q < out.length; q += 3) { const s = d.lvl ? out.fr[q / 3] : d.sway ? (out[q] + d.size[0] / 2) / d.size[0] : (half - out[q + d.la] * d.fs) / (2 * half);                     // switch on front to back (words: left to right)
+      bulb(out[q], out[q + 1], out[q + 2], pal[count % pal.length], -count * 0.45, on0 + onSpan * Math.min(1, Math.max(0, s)), o.blink, 0, d.lvl ? 0.012 : 0); count++; }
   }
   if (mode === 'spiral' || mode === 'both') {
     const ax = o.axis === 'y' ? 1 : o.axis === 'len' ? d.la : d.size.indexOf(Math.max(...d.size));
@@ -916,7 +947,7 @@ function rebuildModel(fresh) {
   if (fresh) $('twoSided').checked = S.dense.inward > 0.3;
   $('repaint').disabled = !S.dense.tint; if (!S.dense.tint) $('repaint').checked = true;
   recolor(); rebuildLights(); S.t0 = performance.now(); S.drag = 0;
-  if (S.preset === '') { const ph = S.kind === 'photo'; setStatus(ph ? 'Your photo is in lights. It stays on this device: nothing is uploaded.' : S.name + ' is ready.' + (S.dense.inward > 0.3 ? ' It has messy faces, so the fix is switched on.' : ''));
+  if (S.preset === '') { const ph = S.kind === 'photo'; setStatus(ph ? (S.raw.traced ? 'The lights are tracing your photo.' : 'Your photo is framed in lights.') + ' It stays on this device: nothing is uploaded.' : S.name + ' is ready.' + (S.dense.inward > 0.3 ? ' It has messy faces, so the fix is switched on.' : ''));
     thumb(ph ? photoTile : fileTile, S.dense, k => S.body.subarray(k * 3, k * 3 + 3), ph ? 0 : undefined); }
 }
 function recolor() {
@@ -989,7 +1020,7 @@ function frame(t) {
   const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.9 : 1.5) : 1) * +$('zoom').value;
   const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
   const psi = 0.42 + S.drag + (fly ? 0.1 * Math.sin(0.45 * t) : 0), Dx = Math.cos(psi), Dz = Math.sin(psi), dist = moving ? Math.abs(speedV) * (fly ? 26 : 11) * t : 0;   // driving or flying: heading and distance covered
-  const yaw = moving ? d.fwdAngle - psi : d.lvl ? 0.26 * Math.sin(speedV * 1.6 * t) + S.drag : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
+  const yaw = moving ? d.fwdAngle - psi : d.lvl ? 0.09 * Math.sin(speedV * 1.6 * t) + S.drag : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
         pv = fly ? top * 0.45 : 0, tall = PH > PW;
   const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : fly ? 1.2 + 0.09 * Math.sin(1.1 * t) : 0;                    // flying: its height above the snow
   const two = $('twoSided').checked, mirror = $('mirror').checked && !moving && !d.lvl, intro = $('intro').checked;
@@ -1025,13 +1056,13 @@ function frame(t) {
   };
 
   // the model (and its mirror image in the floor)
-  const LV = d.lvl, PT = d.paint, P = d.P, N = d.N, C = S.body, np = Math.floor(Math.min(d.n, +$('points').value, S.cap)), la = d.la, fs = d.fs;
+  const LV = d.lvl, RV = d.rev, PT = d.paint, P = d.P, N = d.N, C = S.body, np = Math.floor(Math.min(d.n, +$('points').value, S.cap)), la = d.la, fs = d.fs;
   const roll = drive && d.wheel ? d.wheels.map(w => [Math.cos(dist / w.r), Math.sin(dist / w.r)]) : null;
   for (let pass = 0; pass < (mirror ? 2 : 1); pass++) {
     const my = pass ? -1 : 1, dim = pass ? 0.33 : 1;
     for (let k = 0; k < np; k++) {
       const o = k * 3; let px = P[o], py = P[o + 1], pz = P[o + 2], qx = N[o], qy = N[o + 1], qz = N[o + 2];
-      if (py > grow - ((k * 40503) & 255) * 0.0008) continue;
+      if (LV ? intro && RV && t < u * (2.5 + 8.5 * RV[k] / 255) : py > grow - ((k * 40503) & 255) * 0.0008) continue;      // a photo spreads out from its lit outlines instead of rising from the ground
       if (roll && d.wheel[k]) { const wi = d.wheel[k] - 1, c = d.wheels[wi].c, cw = roll[wi][0], sw = roll[wi][1];        // spin the wheels
         const u = (la ? pz - c[2] : px - c[0]) * fs, v = py - c[1], u2 = (u * cw + v * sw) * fs, nu = (la ? qz : qx) * fs, nu2 = (nu * cw + qy * sw) * fs;
         py = c[1] - u * sw + v * cw; qy = -nu * sw + qy * cw; if (la) { pz = c[2] + u2; qz = nu2; } else { px = c[0] + u2; qx = nu2; } }
@@ -1300,7 +1331,20 @@ function showSoundButton() { const need = !!S.song && S.viewer && !(AU.ctx && AU
 
 // ================================================================ CHOOSING WHAT TO SHOW
 // These events show you whether people share. They go to Vercel Web Analytics, and to Plausible or Umami if you add either.
-function track(name, props) { try { window.va('event', { name, data: props }); if (window.plausible) window.plausible(name, { props }); else if (window.umami) window.umami.track(name, props); } catch (e) {} }
+// Counting what gets made: one anonymous +1 to a free counting service for each video, link and so on. No cookies and nothing about the person; if the service is down, nothing happens.
+const TALLY = 'https://abacus.jasoncameron.dev', TALLY_ON = location.hostname === SITE || location.hostname === 'www.' + SITE;
+const TALLIES = { video_made: 'video', link_made: 'link', card_view: 'card_view', make_own: 'make_own', photo_used: 'photo', model_upload: 'upload', in_app_browser: 'in_app' };
+function tally(key) { if (!TALLY_ON) return; try { fetch(TALLY + '/hit/' + SITE + '/' + key, { mode: 'no-cors', keepalive: true }).catch(() => {}); } catch (e) {} }
+function track(name, props) {
+  if (TALLIES[name]) { tally(TALLIES[name]); if (name === 'video_made' && props && props.shape) tally('video_' + String(props.shape).replace(/[^a-z0-9]/gi, '')); }
+  try { window.va('event', { name, data: props }); if (window.plausible) window.plausible(name, { props }); else if (window.umami) window.umami.track(name, props); } catch (e) {} }
+let errSeen = 0; for (const ev of ['error', 'unhandledrejection']) addEventListener(ev, () => { if (errSeen++ < 3) tally('error'); });       // something broke on someone's device: count it, so a bad update shows up
+async function showCounts(all) {             // how many have been made so far (the address ending in #stats shows the full list)
+  const box = $('counts'), read = async k => { try { const r = await fetch(TALLY + '/get/' + SITE + '/' + k); return r.ok ? (await r.json()).value : 0; } catch (e) { return null; } };
+  if (!all) { const v = await read('video'), l = await read('link'); if (v !== null && v + (l || 0) > 0) box.textContent = 'Made here so far: ' + v.toLocaleString() + ' videos and ' + (l || 0).toLocaleString() + ' links.'; return; }
+  const keys = ['visit', 'video', 'link', 'card_view', 'make_own', 'photo', 'upload', 'in_app', 'error'].concat(['text', 'photo', 'file'].concat(Object.keys(PRESETS)).map(k => 'video_' + k)), out = [];
+  box.style.whiteSpace = 'pre'; for (const k of keys) { const v = await read(k); out.push(k.padEnd(16) + (v === null ? '?' : v)); box.textContent = out.join('\n'); }
+}
 const LOOKS = {
   classic: { label: 'Classic',  palette: 'xmas',     ramp: ' .:-=+*#%@', paint: '#d41a1f' },
   gold:    { label: 'Gold',     palette: 'warm',     ramp: ' .:-=+*#%@', paint: '#c79a1e' },
@@ -1386,7 +1430,7 @@ async function loadPhoto(file) {
   try { setStatus('Reading your photo ...'); const url = URL.createObjectURL(file), im = new Image();
     await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('That picture could not be opened. Try a .jpg or .png.')); im.src = url; });
     const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(true); fineCells(true); } markChips();
-    setModel(raw, 'my photo', first ? { topper: false, repaint: false, mode: 'outline', bulbs: 130 } : null); buildCaption(); track('photo_used', {});
+    setModel(raw, 'my photo', first ? { topper: false, repaint: false, mode: 'outline', bulbs: raw.traced ? 280 : 130 } : null); buildCaption(); track('photo_used', {});
   } catch (e) { setStatus(e.message || String(e), true); }
 }
 async function loadFiles(files) {
@@ -1427,7 +1471,7 @@ function record() {
     btn.textContent = phone ? 'Make another' : 'Download the video'; $('shareVid').hidden = !share; $('shareVid').classList.toggle('alt', !phone); $('shareVid').textContent = phone ? 'Save or share your video' : 'Share the video'; $('capCopy').hidden = false;
     if (phone) setStatus('Your video is ready. Tap the button to save it to your photos or send it straight to Instagram.' + tail);      // phones: one button opens the share sheet, which can save or post
     else { download(blob, baseName() + '.' + ext); setStatus('Saved ' + baseName() + '.' + ext + '.' + tail + (ext === 'webm' ? ' Instagram and TikTok want .mp4: record in Chrome or Safari, or convert it.' : ' Check your downloads.')); }
-    track('video_made', { shape: S.preset || 'upload', sound: S.song || (pop ? 'pop' : 'none') }); };
+    track('video_made', { shape: S.preset || S.kind || 'file', sound: S.song || (pop ? 'pop' : 'none') }); };
   S.t0 = performance.now(); btn.disabled = true; rec.start(250);
   const tick = setInterval(() => { btn.textContent = 'Recording ' + Math.min(secs, (performance.now() - S.t0) / 1000).toFixed(0) + ' / ' + secs + 's'; }, 200);
   setTimeout(() => rec.state !== 'inactive' && rec.stop(), secs * 1000);
@@ -1465,8 +1509,8 @@ const THUMBS = [];                            // tile pictures are drawn a momen
 const tile = (k, label, fn, draw) => { const b = document.createElement('button'), c = document.createElement('canvas'); c.width = 168; c.height = 112; b.className = 'tile'; b.dataset.k = k; b.onclick = fn;
   b.append(c, label); $('gallery').appendChild(b); THUMBS.push(() => draw(c)); return c; };
 tile('text', 'A word', () => { usePreset('text'); $('word').focus(); }, c => presetThumb(c, { make: (n, r) => makeText('ABC', n, r), repaint: true, paint: '#d41a1f' }, -0.3));
-for (const k of ['train', 'globe', 'coupe', 'sedan', 'hatch', 'suv', 'pickup', 'house', 'jet', 'sleigh', 'tree', 'rocket', 'snowman', 'gift']) { const p = PRESETS[k]; tile(k, p.label, () => usePreset(k), c => presetThumb(c, p)); }
 const photoTile = tile('photo', 'Your photo', () => $('photo').click(), photoThumb);
+for (const k of ['train', 'globe', 'coupe', 'sedan', 'hatch', 'suv', 'pickup', 'house', 'jet', 'sleigh', 'tree', 'rocket', 'snowman', 'gift']) { const p = PRESETS[k]; tile(k, p.label, () => usePreset(k), c => presetThumb(c, p)); }
 const fileTile = tile('file', 'Your 3D file', () => $('file').click(), plusThumb);
 const SWATCHES = { Red: '#d41a1f', Green: '#0f7a3d', Blue: '#2a62d8', Yellow: '#f2c21a', Orange: '#ff7a1a', Pink: '#ff5fa2', White: '#f2f2f6', Silver: '#c2c8d2', Black: '#14161c' };
 for (const [name, h] of Object.entries(SWATCHES).reverse()) { const b = document.createElement('button'); b.className = 'sw'; b.dataset.k = h; b.style.background = h; b.title = name; b.setAttribute('aria-label', name);
@@ -1538,6 +1582,9 @@ setMusic(start.get('music') || '', false);
 S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? start.get('song') : 'jingle');
 if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
+tally('visit');
+$('about').addEventListener('toggle', e => { if (e.target.open && !$('counts').textContent) showCounts(false); });
+if (start.has('stats')) { $('about').open = true; showCounts(true); }
 requestAnimationFrame(loop);
 setTimeout(function next() { const f = THUMBS.shift(); if (!f) return; try { f(); } catch (e) {} setTimeout(next, 16); }, 80);
 </script>
