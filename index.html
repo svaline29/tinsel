@@ -149,7 +149,7 @@
   /* ---- the new phone layout: the picture fills the screen, icons down the right open a sheet of choices */
   #statsBox { position:fixed; left:50%; top:50%; transform:translate(-50%, -50%); z-index:30; width:min(92vw, 430px); max-height:86vh; overflow:auto; padding:18px; background:var(--panel); border:1px solid var(--hot); border-radius:14px; box-shadow:0 20px 70px rgba(0,0,0,.8); }
   #statsBox b { font-size:15px; color:#fff; } #statsBox pre { margin:12px 0 14px; font:inherit; color:var(--ink); white-space:pre-wrap; }
-  body.m2 { overflow:hidden; }
+  body.m2 { overflow:hidden; overscroll-behavior:none; } body.m2 #cv { touch-action:none; }
   body.m2 main { display:block; height:100vh; height:100dvh; }
   body.m2 aside, body.m2 #hint, body.m2 #drop { display:none; }
   body.m2 #stage { position:fixed; left:0; right:0; top:0; bottom:var(--m2b, 84px); height:auto; padding:0; border:0; z-index:1; background:var(--bg); transition:bottom .22s ease; }
@@ -944,7 +944,7 @@ function buildLights(d, o) {
 }
 
 // ================================================================ STATE
-const S = { song: '', music: '', kind: '', cellWas: null, fmtWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const S = { spinV: 0, lastA: 0, song: '', music: '', kind: '', cellWas: null, fmtWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
 let tileOn = 0, soft = 0, tint, depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
@@ -982,7 +982,7 @@ function rebuildModel(fresh) {
   S.dense = normalize(S.raw, S.zUp, S.quarter, S.flip);
   if (fresh) $('twoSided').checked = S.dense.inward > 0.3;
   $('repaint').disabled = !S.dense.tint; if (!S.dense.tint) $('repaint').checked = true;
-  recolor(); rebuildLights(); S.t0 = performance.now(); S.drag = 0;
+  recolor(); rebuildLights(); S.t0 = performance.now(); S.drag = 0; S.spinV = 0;
   if (S.preset === '') { const ph = S.kind === 'photo'; setStatus(ph ? (S.raw.traced ? 'The lights are tracing your photo.' : 'Your photo is framed in lights.') + ' It stays on this device: nothing is uploaded.' : S.name + ' is ready.' + (S.dense.inward > 0.3 ? ' It has messy faces, so the fix is switched on.' : ''));
     thumb(ph ? photoTile : fileTile, S.dense, k => S.body.subarray(k * 3, k * 3 + 3), ph ? 0 : undefined); }
 }
@@ -1268,7 +1268,10 @@ function paint() {
 }
 let ema = 16, ticks = 0;
 function loop() {
-  if (S.dense) { const a = performance.now(), t = (a - S.t0) / 1000; auTick(t); frame(t); paint(); ema += (performance.now() - a - ema) * 0.08;
+  if (S.dense) { const a = performance.now(), t = (a - S.t0) / 1000, dt = Math.min(0.05, Math.max(0, (a - (S.lastA || a)) / 1000)); S.lastA = a;
+    if (dragX !== null && $('scene').value === 'spin' && !S.raw.sway) S.drag -= +$('spin').value * dt;       // held: it stops turning by itself, so it stays under the finger
+    else if (S.spinV) { S.drag += S.spinV * dt; S.spinV *= Math.exp(-dt / 0.9); if (Math.abs(S.spinV) < 0.03) S.spinV = 0; }      // flicked: it carries on and slows down
+    auTick(t); frame(t); paint(); ema += (performance.now() - a - ema) * 0.08;
     if (++ticks % 40 === 0) { if (ema > 30 && S.cap > 12000) S.cap = Math.max(12000, Math.min(S.cap, +$('points').value) * 0.8); else if (ema < 13 && S.cap < 1e8) S.cap *= 1.2; }   // slow device: draw fewer points
     if (S.viewer && t > 7 && $('cta').hidden) $('cta').hidden = false; }
   requestAnimationFrame(loop);
@@ -1591,7 +1594,7 @@ let typing = 0;
 $('word').addEventListener('input', () => { if (S.preset === 'text') { clearTimeout(typing); typing = setTimeout(() => useText($('word').value, true), 200); }
   else if (S.preset === 'globe') buildCaption(); });                      // the globe's name is the first line of the caption
 $('word').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
-$('scene').addEventListener('input', () => { S.t0 = performance.now(); S.drag = 0; markChips(); });
+$('scene').addEventListener('input', () => { S.t0 = performance.now(); S.drag = 0; S.spinV = 0; markChips(); });
 $('bUp').onclick = () => { S.zUp = !S.zUp; rebuildModel(false); };
 $('bTurn').onclick = () => { S.quarter = (S.quarter + 1) % 4; rebuildModel(false); };
 $('bFlip').onclick = () => { S.flip = !S.flip; rebuildModel(false); };
@@ -1607,10 +1610,13 @@ $('png').onclick = () => cv.toBlob(b => download(b, baseName() + '.png'), 'image
 addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag'); });
 addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drag'); });
 addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('drag'); if (e.dataTransfer.files.length) { if (S.viewer) leaveViewer(); loadFiles([...e.dataTransfer.files]); } });
-let dragX = null;                                                           // drag the picture sideways to turn the model
-cv.addEventListener('pointerdown', e => { dragX = e.clientX; });
-addEventListener('pointermove', e => { if (dragX !== null) { S.drag += (e.clientX - dragX) * 0.012; dragX = e.clientX; } });
-addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointercancel', () => { dragX = null; });
+// Turning it by hand: the side nearest you follows your finger, and a flick keeps it spinning for a moment before it settles.
+let dragX = null, dragT = 0, dragV = 0;
+const dragStep = () => ($('scene').value === 'spin' ? 1 : -1) * 0.012;      // driving and flying: it is the view that swings round, so the sign flips to keep the near side under the finger
+cv.addEventListener('pointerdown', e => { dragX = e.clientX; dragT = performance.now(); dragV = 0; S.spinV = 0; try { cv.setPointerCapture(e.pointerId); } catch (err) {} });       // touching it also stops a spin
+addEventListener('pointermove', e => { if (dragX === null) return; const now = performance.now(), d = (e.clientX - dragX) * dragStep(); S.drag += d; dragV += (d / (Math.max(4, now - dragT) / 1000) - dragV) * 0.5; dragX = e.clientX; dragT = now; });
+const dragEnd = () => { if (dragX === null) return; S.spinV = performance.now() - dragT < 90 ? Math.max(-14, Math.min(14, dragV)) : 0; dragX = null; };      // a finger that stopped before lifting leaves it still
+addEventListener('pointerup', dragEnd); addEventListener('pointercancel', dragEnd);
 
 // ================================================================ THE NEW PHONE LAYOUT
 // Nothing here runs unless it is switched on. It moves the same controls into sheets, so everything they do stays as it is.
