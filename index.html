@@ -231,6 +231,7 @@
       <label class="row">Snow<input id="snow" type="range" min="0" max="1500" step="50" value="450"><output></output></label>
       <label class="chk"><input id="stars" type="checkbox" checked> Twinkling stars</label>
       <label class="chk"><input id="mirror" type="checkbox" checked> Reflection (spinning only)</label>
+      <label class="chk"><input id="acro" type="checkbox"> Roll over now and then (flying only)</label>
       <label class="chk"><input id="intro" type="checkbox" checked> Build it up from nothing</label>
       <label class="chk"><input id="code" type="checkbox" checked> Show the code at the bottom</label>
 
@@ -529,7 +530,7 @@ function loft(st, smooth) {
     const b = new Float64Array(K), h = smooth >> 1; for (let k = 0; k < K; k++) { let s = 0; for (let d = -h; d <= h; d++) s += a[Math.min(K - 1, Math.max(0, k + d))]; b[k] = s / (2 * h + 1); }
     return b; });
   const g = (a, x) => { const f = Math.min(K - 1.0001, Math.max(0, (x - x0) / (x1 - x0) * (K - 1))), i = Math.floor(f); return a[i] + (a[i + 1] - a[i]) * (f - i); };
-  const L = { x0, x1, top: x => g(cols[2], x), mid: x => (g(cols[1], x) + g(cols[2], x)) / 2,
+  const L = { x0, x1, wid: x => g(cols[0], x), top: x => g(cols[2], x), mid: x => (g(cols[1], x) + g(cols[2], x)) / 2,
     at(x, th, o) { const w = g(cols[0], x), yb = g(cols[1], x), yt = g(cols[2], x), e = g(cols[3], x), c = Math.cos(th), s = Math.sin(th);
       o[0] = x; o[1] = (yt + yb) / 2 + (yt - yb) / 2 * Math.sign(s) * Math.pow(Math.abs(s), 2 / e); o[2] = w * Math.sign(c) * Math.pow(Math.abs(c), 2 / e); } };
   return L;
@@ -613,11 +614,11 @@ function makeText(str, n, r) {               // any word, as fat 3D letters (lon
 // ---- parts for building things out of simple pieces
 function skin(B, st, smooth, n, r, caps, colour) {            // a lofted body; colour(x, y, z, L) returns [colour, paintable] or nothing to leave a hole
   const L = loft(st, smooth); loftEach(L, n, r, caps, (x, y, z, nx, ny, nz) => { const c = colour(x, y, z, L); if (c) put(B, x, y, z, nx, ny, nz, c[0], c[1]); }); return L; }
-function wing(B, n, r, a, b, ca, cb, th, col, paint) {        // a thin tapered surface from root a to tip b (points on the front edge); it runs back along -x by ca at the root and cb at the tip
+function wing(B, n, r, a, b, ca, cb, th, col, paint, tip) {        // a thin tapered surface from root a to tip b (points on the front edge); it runs back along -x by ca at the root and cb at the tip
   const sx = b[0] - a[0], sy = b[1] - a[1], sz = b[2] - a[2], sl = Math.hypot(sy, sz) || 1, ty = -sz / sl, tz = sy / sl, big = Math.max(ca, cb);
   for (let k = 0; k < n;) { const s = r(), ch = ca + (cb - ca) * s; if (r() * big > ch) continue; k++;
     const c = r(), side = r() < .5 ? 1 : -1, h = th * ch * 2.6 * Math.sqrt(c) * (1 - c) * side;
-    put(B, a[0] + sx * s - c * ch, a[1] + sy * s + ty * h, a[2] + sz * s + tz * h, c < .12 ? .7 : -.08, ty * side, tz * side, col, paint); }
+    const band = tip && s > 1 - tip[0]; put(B, a[0] + sx * s - c * ch, a[1] + sy * s + ty * h, a[2] + sz * s + tz * h, c < .12 ? .7 : -.08, ty * side, tz * side, band ? tip[1] : col, band ? 0 : paint); }   // tip: [how much of the outer end, its colour]
   B.segs.push(a[0], a[1], a[2], b[0], b[1], b[2], 1, 0, 0, b[0], b[1], b[2], b[0] - cb, b[1], b[2], 0, sy / sl, sz / sl, a[0] - ca, a[1], a[2], b[0] - cb, b[1], b[2], -1, 0, 0);   // lights along the front, the tip and the back
 }
 function rod(B, n, r, a, b, rad, col, paint) {                // a round bar from a to b
@@ -639,20 +640,20 @@ function segBox(B, cx, cy, cz, sx, sy, sz) {  // lights along the top edges and 
   segPath(B, [[x0, y1, z1], [x1, y1, z1]], 0, 1, 1); segPath(B, [[x0, y1, z0], [x1, y1, z0]], 0, 1, -1); segPath(B, [[x0, y1, z0], [x0, y1, z1]], -1, 1, 0); segPath(B, [[x1, y1, z0], [x1, y1, z1]], 1, 1, 0);
   for (const x of [x0, x1]) for (const z of [z0, z1]) segPath(B, [[x, y0, z], [x, y1, z]], Math.sign(x - cx), 0, Math.sign(z - cz)); }
 
-function makeJet(n, r) { const B = builder(), SKIN = [.6, .65, .72], GLASS = [.13, .2, .33], DARK = [.16, .17, .2];
+function makeJet(n, r) { const B = builder(), SKIN = [.6, .65, .72], GLASS = [.16, .26, .42], DARK = [.16, .17, .2], NOSE = [.3, .32, .37], RED = [.85, .12, .14];
   const body = skin(B, [[-2.4, .30, .40, .68, 3], [-2.2, .38, .34, .72, 3], [-1.2, .44, .30, .78, 3], [-.2, .42, .28, .80, 2.8], [.7, .34, .30, .78, 2.4], [1.5, .24, .36, .70, 2.1], [2.1, .13, .44, .62, 2], [2.6, .02, .52, .55, 2]],
-    5, Math.floor(n * .40), r, true, x => [x < -2.25 ? DARK : SKIN, x >= -2.25]);
+    5, Math.floor(n * .40), r, true, x => x < -2.25 ? [DARK, 0] : x > 2.0 ? [NOSE, 0] : [SKIN, 1]);
   skin(B, [[.45, .05, .76, .80, 2], [.75, .17, .74, .98, 2], [1.15, .19, .72, 1.02, 2], [1.55, .14, .68, .86, 2], [1.8, .04, .62, .68, 2]], 3, Math.floor(n * .05), r, false, (x, y) => y > body.top(x) - .02 ? [GLASS, 0] : null);
   for (const s of [1, -1]) {
-    wing(B, Math.floor(n * .15), r, [.55, .54, s * .36], [-1.0, .54, s * 1.85], 2.0, .5, .05, SKIN, 1);            // main wings
+    wing(B, Math.floor(n * .15), r, [.55, .54, s * .36], [-1.0, .54, s * 1.85], 2.0, .5, .05, SKIN, 1, [.13, RED]);            // main wings
     wing(B, Math.floor(n * .045), r, [-1.45, .54, s * .36], [-2.15, .54, s * 1.05], .85, .35, .05, SKIN, 1);       // tailplanes
-    wing(B, Math.floor(n * .06), r, [-1.15, .74, s * .26], [-1.95, 1.52, s * .50], 1.0, .4, .05, SKIN, 1);         // two fins, leaning outward
+    wing(B, Math.floor(n * .06), r, [-1.15, .74, s * .26], [-1.95, 1.52, s * .50], 1.0, .4, .05, SKIN, 1, [.3, RED]);         // two fins, leaning outward
     rod(B, Math.floor(n * .02), r, [-2.38, .53, s * .2], [-2.62, .53, s * .2], .17, DARK, 0);                       // exhausts
     boxEach(Math.floor(n * .02), .95, .44, s * .43, .7, .26, .2, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, nx > .5 ? DARK : SKIN, nx <= .5 ? 1 : 0));   // air intakes
     B.lamps.push([-2.68, .53, s * .2, 1, .5, .12], [-1.25, .54, s * 1.88, s > 0 ? .1 : 1, s > 0 ? 1 : .1, .1]);      // engine glow, wingtip lights
   }
   segLine(B, body, 90, -2.2, 2.5, 40); segLine(B, body, 270, -2.2, 2.5, 30);
-  return finish(B, r, { fwd: [1, 0, 0] });
+  return finish(B, r, { fwd: [1, 0, 0], fire: true, trail: [[-2.66, .53, .2], [-2.66, .53, -.2]] });
 }
 function makeTrain(n, r) { const B = builder(), BODY = [.1, .45, .22], BLACK = [.13, .13, .15], RED = [.8, .12, .12], GOLD = [1, .8, .3], GLASS = [.2, .3, .45], STEEL = [.75, .77, .8];
   const band = x => Math.abs(x - .2) < .045 || Math.abs(x - 1.25) < .045;
@@ -677,7 +678,7 @@ function makeTrain(n, r) { const B = builder(), BODY = [.1, .45, .22], BLACK = [
 }
 function makeSleigh(n, r) { const B = builder(), RED = [.8, .1, .14], GOLD = [1, .8, .3], SACK = [.5, .3, .14];
   const tub = skin(B, [[-1.3, .44, .62, 1.62, 5], [-1.12, .56, .46, 1.70, 5], [-.7, .6, .38, 1.2, 5], [-.1, .6, .36, .98, 5], [.5, .58, .38, 1.0, 5], [.9, .52, .50, 1.22, 5], [1.15, .42, .74, 1.5, 4], [1.3, .26, 1.1, 1.6, 3]],
-    9, Math.floor(n * .5), r, true, (x, y, z, L) => { const trim = y > L.top(x) - .07; return [trim ? GOLD : RED, trim ? 0 : 1]; });
+    9, Math.floor(n * .5), r, true, (x, y, z, L) => { const up = y > L.top(x) - .07; return up && Math.abs(z) < L.wid(x) * .8 ? [[.3, .07, .09], 0] : [up ? GOLD : RED, up ? 0 : 1]; });   // gold rim, dark inside
   sphereEach(Math.floor(n * .12), -.5, 1.3, 0, .46, r, (x, y, z, nx, ny, nz) => put(B, x, 1.3 + (y - 1.3) * 1.15, z, nx, ny, nz, SACK, 0));                                    // the sack
   boxEach(Math.floor(n * .03), .0, 1.12, .22, .34, .3, .34, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, Math.abs(x) < .05 || Math.abs(z - .22) < .05 ? GOLD : [.1, .55, .25], 0));
   boxEach(Math.floor(n * .03), -.05, 1.1, -.25, .3, .26, .3, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, Math.abs(x + .05) < .05 || Math.abs(z + .25) < .05 ? GOLD : [.2, .35, .8], 0));
@@ -713,7 +714,7 @@ const PRESETS = {
   suv:     car('SUV', CROSSOVER, '#2a62d8'),
   pickup:  car('Pickup', PICKUP, '#e8ecf2'),
   train:   { label: 'Steam train', make: (n, r) => makeTrain(n, r), topper: false, repaint: true, paint: '#0f7a3d', mode: 'outline', car: true, bulbs: 320 },
-  jet:     { label: 'Jet',     make: (n, r) => makeJet(n, r),     topper: false, repaint: true,  paint: '#8d99ae', mode: 'outline', scene: 'fly' },
+  jet:     { label: 'Jet',     make: (n, r) => makeJet(n, r),     topper: false, repaint: true,  paint: '#8d99ae', mode: 'outline', scene: 'fly', acro: true, bulbs: 340 },
   sleigh:  { label: 'Sleigh',  make: (n, r) => makeSleigh(n, r),  topper: false, repaint: true,  paint: '#c8102e', mode: 'outline', scene: 'fly' },
   tree:    { label: 'Tree',    make: (n, r) => makeTree(n, r),    topper: true,  repaint: false, paint: '#1f9d3a', mode: 'spiral' },
   rocket:  { label: 'Rocket',  make: (n, r) => makeRocket(n, r),  topper: false, repaint: false, paint: '#e6ebf5', mode: 'spiral' },
@@ -739,7 +740,8 @@ function normalize(src, zUp, quarter, flip) {
   const lamps = (src.lamps || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return [q[0], q[1], q[2], l[3], l[4], l[5]]; });
   const la = size[0] >= size[2] ? 0 : 2; let fwd = [0, 0, 0]; if (src.fwd) fix(src.fwd, fwd, 0); else fwd[la] = 1;
   if (flip) { fwd[0] = -fwd[0]; fwd[2] = -fwd[2]; }
-  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, sway: !!src.sway, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
+  const trail = (src.trail || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
+  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
   if (src.wheel) { d.wheel = src.wheel; const acc = [];
     for (let k = 0; k < n; k++) { const w = src.wheel[k]; if (!w) continue; const q = acc[w - 1] || (acc[w - 1] = [0, 0, 0, 0, -1e9]);
       q[0] += P[k * 3]; q[1] += P[k * 3 + 1]; q[2] += P[k * 3 + 2]; q[3]++; if (P[k * 3 + 1] > q[4]) q[4] = P[k * 3 + 1]; }
@@ -794,13 +796,14 @@ function buildLights(d, o) {
 const S = { raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, PW = 1080, PH = 1920, OX = 0, OY = 0;
-let depth, chr, col, emit, halo, img, px32, atlas, ramp, capBmp = null, markBmp = null, panelBase = 1e9, CODE = null;
+let depth, chr, col, emit, halo, img, px32, atlas, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
 const cv = $('cv'), ctx = cv.getContext('2d');
-const R0 = rng(1), snowP = new Float32Array(1500 * 6), starsP = new Float32Array(300 * 6), floorP = [], sprayP = new Float32Array(140 * 5), TREES = [], FOREST = [];
+const R0 = rng(1), snowP = new Float32Array(1500 * 6), starsP = new Float32Array(300 * 6), floorP = [], sprayP = new Float32Array(140 * 5), trailP = new Float32Array(260 * 4), TREES = [], FOREST = [];
 for (let i = 0; i < 1500; i++) snowP.set([R0() * 9, R0() * 5, R0() * 8, R0() * 6.28, 0.45 * (0.6 + 0.8 * R0()), R0()], i * 6);
 for (let i = 0; i < 300; i++) starsP.set([R0(), Math.pow(R0(), 1.3), 0.25 + 0.75 * Math.pow(R0(), 2.5), R0() * 6.28, 2.2 * (0.4 + R0()), 0.8 + 0.2 * R0()], i * 6);
 for (let z = -9; z < 4.5; z += 0.32) for (let x = -9; x < 9; x += 0.16) floorP.push(x + gauss(R0) * 0.024, z + gauss(R0) * 0.014, 0.6 + 0.4 * R0(), '..::-='.charCodeAt(Math.floor(R0() * 6)));
 for (let i = 0; i < 140; i++) sprayP.set([R0() * 0.55, 2.0 + R0() * 1.2, 0.8 + R0() * 0.9, gauss(R0) * 0.35, i % 2 ? 1 : -1], i * 5);
+{ const RT = rng(77); for (let i = 0; i < 260; i++) trailP.set([RT(), gauss(RT), gauss(RT), RT()], i * 4); }      // its own dice, so the pines stay where they were
 for (let v = 0; v < 3; v++) { const n = 3600, P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3); let k = 0;   // roadside pines
   latheEach(pineProfile(1, .36 + .05 * v, 6), n, R0, (x, y, z, nx, ny, nz) => { const l = Math.hypot(nx, ny, nz) || 1, g = R0(), trunk = y < .12, snowy = !trunk && ny / l > .3 && R0() < .7;
     P.set([x, y, z], k * 3); N.set([nx / l, ny / l, nz / l], k * 3); C.set(trunk ? [.4, .26, .14] : snowy ? [.9, .94, 1] : [.10 + .1 * g, .42 + .3 * g, .14], k * 3); k++; });
@@ -808,7 +811,7 @@ for (let v = 0; v < 3; v++) { const n = 3600, P = new Float32Array(n * 3), N = n
 for (let i = 0; i < 9; i++) FOREST.push({ v: i % 3, u: -15 + i * 30 / 9 + R0() * 2, l: 2.4 + R0() * 4.5, s: 1.7 + R0() * 1.2 });
 
 const LIGHT_IDS = ['mode', 'palette', 'bulbs', 'turns', 'axis', 'blink', 'topper', 'intro', 'bpm'];
-const SHARE_IDS = LIGHT_IDS.concat(['scene', 'spin', 'zoom', 'snow', 'stars', 'mirror', 'caption', 'format', 'cell', 'ramp', 'points', 'paint', 'repaint', 'code', 'from', 'word']);
+const SHARE_IDS = LIGHT_IDS.concat(['scene', 'spin', 'zoom', 'snow', 'stars', 'mirror', 'caption', 'format', 'cell', 'ramp', 'points', 'paint', 'repaint', 'code', 'from', 'word', 'acro']);
 const val = id => { const e = $(id); return e.type === 'checkbox' ? (e.checked ? '1' : '0') : e.value; };
 const setVal = (id, v) => { const e = $(id); if (!e) return; if (e.type === 'checkbox') e.checked = v === '1' || v === true; else e.value = v; e.dispatchEvent(new Event('input')); };
 const beatUnit = () => { const b = +$('bpm').value; return b ? 60 / b : 0.56; };          // seconds per beat: the build-up is timed in beats so it lands on the music
@@ -818,7 +821,7 @@ function setStatus(msg, err) { const s = $('status'); s.textContent = msg; s.cla
 
 function setModel(raw, name, look) {
   S.raw = raw; S.name = name; S.quarter = 0; S.flip = false; S.zUp = !!raw.zUp;
-  if (look) { $('topper').checked = look.topper; $('repaint').checked = look.repaint; if (look.paint) $('paint').value = look.paint; if (look.mode) $('mode').value = look.mode; $('bulbs').value = look.bulbs || 260; $('bulbs').dispatchEvent(new Event('input')); }
+  if (look) { $('topper').checked = look.topper; $('repaint').checked = look.repaint; if (look.paint) $('paint').value = look.paint; if (look.mode) $('mode').value = look.mode; $('acro').checked = !!look.acro; $('bulbs').value = look.bulbs || 260; $('bulbs').dispatchEvent(new Event('input')); }
   rebuildModel(true);
 }
 function rebuildModel(fresh) {
@@ -842,7 +845,7 @@ function rebuildLights() { if (S.dense) S.lights = buildLights(S.dense, opts());
 function resize() {
   [PW, PH] = $('format').value.split('x').map(Number); CW = +$('cell').value; CH = CW * 2;
   W = Math.floor(PW / CW); H = Math.floor(PH / CH); OX = (PW - W * CW) >> 1; OY = (PH - H * CH) >> 1;
-  cv.width = PW; cv.height = PH;
+  cv.width = PW; cv.height = PH; GLOW.clear();
   depth = new Float32Array(W * H); chr = new Uint8Array(W * H); col = new Float32Array(W * H * 3); emit = new Uint8Array(W * H); halo = new Float32Array(W * H * 3);
   img = ctx.createImageData(PW, PH); px32 = new Uint32Array(img.data.buffer);
   const g = document.createElement('canvas'); g.width = CW; g.height = CH; const gx = g.getContext('2d', { willReadFrequently: true });
@@ -865,13 +868,12 @@ function textBitmap(lines, rows) {            // draw text with a normal font at
   const d = x.getImageData(0, 0, W, c.height).data, a = new Uint8Array(W * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
   return { a, rows: c.height };
 }
+function captionLines() { const s = captionText(); if (!s) return []; if (s.length <= 16 || !s.includes(' ')) return [s];       // long captions break into two lines at the space nearest the middle
+  let b = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (b < 0 || Math.abs(i - s.length / 2) < Math.abs(b - s.length / 2))) b = i; return [s.slice(0, b), s.slice(b + 1)]; }
 function buildCaption() {
-  capBmp = markBmp = null; if (!W) return; const s = captionText();
-  if (s) { let lines = [s]; if (s.length > 16 && s.includes(' ')) { let b = -1; for (let i = 0; i < s.length; i++) if (s[i] === ' ' && (b < 0 || Math.abs(i - s.length / 2) < Math.abs(b - s.length / 2))) b = i; lines = [s.slice(0, b), s.slice(b + 1)]; }
-    capBmp = textBitmap(lines, Math.max(lines.length > 1 ? 7 : 9, Math.round(H * (lines.length > 1 ? 0.052 : 0.07)))); }
-  markBmp = textBitmap([siteLabel().toUpperCase()], Math.max(6, Math.round(H * 0.042)));                    // the site name, big enough to read on a phone
-  let x0 = W, x1 = 0; for (let i = 0; i < markBmp.a.length; i++) if (markBmp.a[i] > 76) { const x = i % W; if (x < x0) x0 = x; if (x > x1) x1 = x; }
-  markBmp.x0 = Math.max(0, x0 - 2); markBmp.x1 = Math.min(W - 1, x1 + 2);                                    // how wide the name is, plus a little margin
+  capBmp = stamp = null; if (!W) return; const s = captionText();
+  const fs = Math.round(Math.min(PW, PH) * 0.043), y = Math.round(PH * (PH > PW ? 0.15 : 0.055)), w = siteLabel().length * fs * 0.62;   // the site address: a real font, big enough for a phone, and below where Instagram puts its own header on tall videos
+  stamp = { fs, y, r0: Math.max(0, Math.floor((y - fs * 0.85 - OY) / CH)), r1: Math.min(H - 1, Math.floor((y + fs * 0.85 - OY) / CH)), x0: Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW) - 1), x1: Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW) + 1) };
 }
 
 // ================================================================ ONE FRAME: FILL THE CHARACTER GRID
@@ -889,14 +891,18 @@ function frame(t) {
   let fy = ty - ey, fz = -ez; const fl = Math.hypot(fy, fz); fy /= fl; fz /= fl;                    // camera looks down -Z, tilted
   const short = Math.min(H, W / aspect), vis = 2 * fl * Math.tan(15 * Math.PI / 180) / short;       // world units per row
   const fit = Math.min(0.80 * vis * (W / aspect) / Math.hypot(d.size[0], d.size[2]), 0.74 * vis * VH / (top * (moving ? 1.2 : 1.9) + 0.4));
-  const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.85 : 1.15) : 1) * +$('zoom').value;
+  const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.9 : 1.5) : 1) * +$('zoom').value;
   const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
   const psi = 0.42 + S.drag + (fly ? 0.1 * Math.sin(0.45 * t) : 0), Dx = Math.cos(psi), Dz = Math.sin(psi), dist = moving ? Math.abs(speedV) * (fly ? 26 : 11) * t : 0;   // driving or flying: heading and distance covered
   const yaw = moving ? d.fwdAngle - psi : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
-        pv = fly ? top * 0.45 : 0, M = turn(yaw, fly ? 0.38 + 0.3 * Math.sin(0.8 * t) + 0.06 * Math.sin(1.9 * t) : 0, fly ? 0.07 * Math.sin(0.6 * t + 1) : 0, d.fwdAngle);   // flying: it leans its top towards you, banks, and noses up and down around its own middle
+        pv = fly ? top * 0.45 : 0, tall = PH > PW;
   const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : fly ? 1.2 + 0.09 * Math.sin(1.1 * t) : 0;                    // flying: its height above the snow
   const two = $('twoSided').checked, mirror = $('mirror').checked && !moving, intro = $('intro').checked;
-  const u = beatUnit(), bpm = +$('bpm').value, beat = bpm ? 0.92 + 0.6 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights stay lit and flash brighter on every beat (the first beat is at time zero)
+  const u = beatUnit(), rb = t / u - 12, rph = ((rb % 8) + 8) % 8, rq = rph / 3;
+  const rollA = fly && $('acro').checked && rb >= 0 && rph < 3 ? TAU * rq * rq * (3 - 2 * rq) : 0;                                         // a full roll every eight beats, the first one as the caption lands
+  const M = turn(yaw, fly ? 0.75 + 0.18 * Math.sin(0.8 * t) + 0.05 * Math.sin(1.9 * t) + rollA : 0, fly ? (tall ? 0.6 : 0.3) + 0.06 * Math.sin(0.6 * t + 1) : 0, d.fwdAngle);   // flying: it climbs across the picture with its top turned towards you
+  const fwx = Math.cos(d.fwdAngle), fwz = Math.sin(d.fwdAngle), nX = M[0] * fwx + M[2] * fwz, nY = M[3] * fwx + M[5] * fwz, nZ = M[6] * fwx + M[8] * fwz;   // which way the nose points
+  const bpm = +$('bpm').value, beat = bpm ? 0.92 + 0.6 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights stay lit and flash brighter on every beat (the first beat is at time zero)
   const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
   depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0);
 
@@ -939,8 +945,7 @@ function frame(t) {
   }
   // the ground
   const half = d.size[la] / 2, Fx = Dx * half, Fz = Dz * half;
-  for (let k = 0; k < floorP.length; k += 4) { let x = floorP[k], z = floorP[k + 1], s = floorP[k + 2], r = .30 * s, g = .36 * s, b = .50 * s, gl = floorP[k + 3];
-    if (fly) { x = wrap(x - Dx * dist, -9, 18); z = wrap(z - Dz * dist, -9, 13.5); r = .24 * s; g = .29 * s; b = .40 * s; }                         // snowfields sliding past far below
+  for (let k = 0; k < floorP.length && !fly; k += 4) { let x = floorP[k], z = floorP[k + 1], s = floorP[k + 2], r = .30 * s, g = .36 * s, b = .50 * s, gl = floorP[k + 3];
     if (drive) { x = wrap(x - Dx * dist, -9, 18); z = wrap(z - Dz * dist, -9, 13.5); r = .40 * s; g = .46 * s; b = .60 * s;
       const rx = x - Fx, rz = z - Fz, along = rx * Dx + rz * Dz, lat = Math.abs(-rx * Dz + rz * Dx);                    // headlight beam on the snow
       if (along > 0.05 && along < 7 && lat < 0.3 + 0.34 * along) { const q = 1.5 / (1 + along * 0.45); r += q; g += q * .93; b += q * .7; if (q > .55) gl = 43; } }
@@ -954,10 +959,17 @@ function frame(t) {
       plot(bx - Dx * sprayP[o + 1] * a + Dz * sprayP[o + 3] * a, Math.max(0.02, sprayP[o + 2] * a - 2.25 * a * a), bz - Dz * sprayP[o + 1] * a - Dx * sprayP[o + 3] * a, g, g, g * 1.05, k % 3 ? 46 : 42, 0); }
   }
   // falling snow
-  const ns = +$('snow').value, sdx = Dx * dist * 0.7, sdz = Dz * dist * 0.7;
+  const ns = +$('snow').value, fd = Math.abs(speedV) * 9 * t, sdx = fly ? nX * fd : Dx * dist * 0.7, sdy = fly ? nY * fd : 0, sdz = fly ? nZ * fd : Dz * dist * 0.7;
   for (let k = 0; k < ns; k++) { const o = k * 6, ph = snowP[o + 3], big = snowP[o + 5], g = 0.55 + 0.45 * ((big * 7) % 1);
-    plot(wrap(snowP[o] + 0.15 * Math.sin(1.3 * t + ph) - sdx, 0, 9) - 4.5, wrap(snowP[o + 1] - snowP[o + 4] * t, 0, 5),
-         wrap(snowP[o + 2] + 0.15 * Math.cos(1.1 * t + ph) - sdz, 0, 8) - 4, g, g, g, big > 0.9 ? 42 : big > 0.55 ? 43 : 46, 0); }
+    const x = wrap(snowP[o] + 0.15 * Math.sin(1.3 * t + ph) - sdx, 0, 9) - 4.5, y = wrap(snowP[o + 1] - snowP[o + 4] * t - sdy, 0, fly ? 6 : 5), z = wrap(snowP[o + 2] + 0.15 * Math.cos(1.1 * t + ph) - sdz, 0, 8) - 4;
+    plot(x, y, z, g, g, g, big > 0.9 ? 42 : big > 0.55 ? 43 : 46, 0);
+    if (fly) for (let j = 1; j < 4; j++) { const q = g * (0.6 - 0.15 * j); plot(x + nX * 0.07 * j, y + nY * 0.07 * j, z + nZ * 0.07 * j, q, q, q * 1.1, 46, 0); } }   // flying: each flake leaves a short streak
+  if (fly && t > 4 * u) {                                                                              // something streams out behind: flame and smoke from engines, sparkles from anything else
+    const fade = Math.min(1, (t - 4 * u) / u), ext = (Math.abs(fwx) * d.size[0] + Math.abs(fwz) * d.size[2]) / 2, src = d.trail.length ? d.trail : [[-fwx * ext, top * 0.45, -fwz * ext]];
+    for (let k = 0; k < 260; k++) { const o = k * 4, e = src[k % src.length], ey2 = e[1] - pv, a = (t * (0.8 + 0.5 * trailP[o + 3]) + trailP[o]) % 1, sp = 0.02 + 0.3 * a, len = (d.fire ? 3.6 : 3.0) * a;
+      const x = M[0] * e[0] + M[1] * ey2 + M[2] * e[2] - nX * len + trailP[o + 1] * sp, y = pv + M[3] * e[0] + M[4] * ey2 + M[5] * e[2] + bob - nY * len + trailP[o + 2] * sp, z = M[6] * e[0] + M[7] * ey2 + M[8] * e[2] - nZ * len + trailP[o + 1] * trailP[o + 2] * sp;
+      if (d.fire) { if (a < 0.1) plot(x, y, z, fade, .95 * fade, .7 * fade, 64, 1); else if (a < 0.3) plot(x, y, z, (1.1 - a) * fade, (.6 - a) * fade, .1, 42, 1); else { const g = 0.55 * (1 - a) * fade; plot(x, y, z, g * .9, g * .95, g * 1.1, a < 0.6 ? 58 : 46, 0); } }
+      else { const b = (1 - a) * (0.5 + 0.5 * Math.sin(t * 9 + trailP[o] * 40)) * fade; if (b > 0.08) plot(x, y, z, b, b * .85, b * .45, a < 0.35 ? 42 : a < 0.7 ? 43 : 46, a < 0.5 ? 1 : 0); } } }
 
   // glow: lights tint the cells around them
   const cells = W * H;
@@ -969,6 +981,11 @@ function frame(t) {
     if (chr[i]) { col[j] += halo[j]; col[j + 1] += halo[j + 1]; col[j + 2] += halo[j + 2]; }
     else if (hm > 0.16) { chr[i] = 46; col[j] = halo[j] * 1.6; col[j + 1] = halo[j + 1] * 1.6; col[j + 2] = halo[j + 2] * 1.6; } }
 
+  if (fly) { const mx = W * (tall ? 0.27 : 0.2), my2 = VH * 0.31, R = Math.min(PW, PH) * 0.17, rx = R / CW, ry = R / CH;                            // a moon, behind everything
+    for (let y = Math.max(0, Math.floor(my2 - ry)); y <= Math.min(H - 1, my2 + ry); y++) for (let x = Math.max(0, Math.floor(mx - rx)); x <= Math.min(W - 1, mx + rx); x++) {
+      const dx = (x - mx) / rx, dy = (y - my2) / ry, q = dx * dx + dy * dy, i = y * W + x; if (q > 1 || chr[i]) continue;
+      const l = Math.max(0, -0.45 * dx - 0.35 * dy + 0.82 * Math.sqrt(1 - q)), cr = 0.5 + 0.5 * Math.sin(dx * 7.3 + 1.7) * Math.sin(dy * 6.1 + 0.4) * Math.sin((dx - dy) * 4.2), b = (0.2 + 0.8 * l) * (0.7 + 0.3 * cr);
+      chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(b * nr)))]; col[i * 3] = .68 * b; col[i * 3 + 1] = .67 * b; col[i * 3 + 2] = .56 * b; } }
   // stars (only where the sky is empty)
   if ($('stars').checked) for (let k = 0; k < 300; k++) { const o = k * 6, x = Math.floor(starsP[o] * W), y = Math.floor(starsP[o + 1] * VH * (drive ? 0.45 : 0.58)), i = y * W + x;
     if (chr[i]) continue; const b = starsP[o + 2] * (0.55 + 0.45 * Math.sin(starsP[o + 4] * t + starsP[o + 3])), g = 0.3 + 0.7 * b, tn = starsP[o + 5];
@@ -979,29 +996,23 @@ function frame(t) {
     const i = row * W + x; chr[i] = c > 32 && c < 127 ? c : 0; emit[i] = 0; col[i * 3] = .42; col[i * 3 + 1] = .47; col[i * 3 + 2] = .56; } };
   let lit_n = 0; const LD = S.lights.data, per = S.lights.dots; for (let k = 0; k < S.lights.bulbs; k++) if (LD[k * per * 9 + 7] <= t) lit_n++;
   const deg = (((yaw * 180 / Math.PI) % 360) + 360) % 360;
-  if (markBmp) { const r0 = Math.round(H * 0.035);                                                     // site name near the top
-    for (let y = -1; y <= markBmp.rows; y++) for (let x = markBmp.x0; x <= markBmp.x1; x++) { const i = (r0 + y) * W + x; chr[i] = 0; emit[i] = 0; }   // clear a strip behind it, so trees and snow never tangle with the letters
-    for (let y = 0; y < markBmp.rows; y++) for (let x = 0; x < W; x++) { const a = Math.min(1, markBmp.a[y * W + x] / 255 * 2.4); if (a < 0.3) continue;
-      const i = (r0 + y) * W + x, q = 0.22 + 0.4 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q * .85; col[i * 3 + 1] = q * .92; col[i * 3 + 2] = q * 1.15; } }
+  if (stamp) for (let y = stamp.r0; y <= stamp.r1; y++) for (let x = stamp.x0; x <= stamp.x1; x++) { const i = y * W + x; chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; }   // keep the strip behind the site address clear
   const from = $('from').value.trim();
-  text(base - 3, 0, siteLabel() + ' . ' + S.name + (from ? ' . from ' + from : ''));
-  text(base - 2, 0, (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : fly ? 'airspeed ' + (Math.abs(speedV) * 420).toFixed(0).padStart(3, '0') + ' kt' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs);
-  text(base - 1, 0, 'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas'));
+  S.tt = t; S.hud = [siteLabel() + ' . ' + S.name + (from ? ' . from ' + from : ''),
+    (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : fly ? 'airspeed ' + (Math.abs(speedV) * 420).toFixed(0).padStart(3, '0') + ' kt' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs,
+    'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas')];                 // drawn by paint() in a real font, so a phone can read them
   const capT = intro ? 12 * u : 5;
-  if (capBmp && t > capT) { const rows = capBmp.rows, row0 = base - 5 - rows, upTo = Math.min(W, (t - capT) * W / 2);          // big caption made of characters, wiped on
-    for (let y = 0; y < rows; y++) for (let x = 0; x < upTo; x++) { const a = Math.min(1, capBmp.a[y * W + x] / 255 * 2.4); if (a < 0.3) continue;
-      const i = (row0 + y) * W + x, q = 0.45 + 0.55 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q; col[i * 3 + 1] = q * .88; col[i * 3 + 2] = q * .5; } }
-  if (pr) {                                                                                           // the code panel: this page's own source, typing itself
+  const capL = captionLines(), mm = Math.min(PW, PH), cfs = capL.length ? Math.round(Math.min(mm * (capL.length > 1 ? 0.07 : 0.085), PW * 0.92 / (Math.max(...capL.map(l => l.length)) * 0.6))) : 0;
+  const hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = cfs * 1.2 * capL.length, capY = Math.min(hudTop - cfs * 0.4, PH > PW ? PH * 0.8 - cfs * 0.3 : 1e9) - capH + cfs * 0.6;   // above the status lines, and above Instagram's reply bar on tall videos
+  S.capText = { lines: capL, fs: cfs, y: capY, n: t > capT ? Math.floor((t - capT) * 18) : 0 };                                   // the caption types itself in; paint() draws it
+  if (S.capText.n > 0) { const w = Math.max(...capL.map(l => l.length)) * 0.6 * cfs + cfs, c0 = Math.max(0, Math.floor((PW / 2 - w / 2 - OX) / CW)), c1 = Math.min(W - 1, Math.ceil((PW / 2 + w / 2 - OX) / CW));
+    for (let y = Math.max(0, Math.floor((capY - cfs * 0.7 - OY) / CH)); y <= Math.min(H - 1, Math.floor((capY + capH - cfs * 0.5 - OY) / CH)); y++) for (let x = c0; x <= c1; x++) { const i = y * W + x; chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; } }
+  if (pr) {                                                                                           // keep the code panel's rows empty: paint() writes the code there
     for (let i = base * W; i < cells; i++) { chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; }
-    const s = t * 2.4, first = Math.floor(s), vis = pr - 1;
-    for (let v = 0; v < vis; v++) { const li = (CODE_AT + first + v) % CODE.length, L = CODE[li], row = base + 1 + v, no = String(li + 1).padStart(4) + '  ';
-      const lim = v === vis - 1 ? Math.floor((s - first) * 1.5 * L.t.length) : 1e9;
-      for (let k = 0; k < no.length; k++) { const i = row * W + k, c = no.charCodeAt(k); if (c > 32) { chr[i] = c; col[i * 3] = .28; col[i * 3 + 1] = .31; col[i * 3 + 2] = .4; } }
-      for (let k = 0; k < L.t.length && k < lim && k + 6 < W; k++) { const c = L.t.charCodeAt(k); if (c <= 32 || c > 126) continue; const i = row * W + k + 6, q = CODE_COL[L.c[k]];
-        chr[i] = c; col[i * 3] = q[0]; col[i * 3 + 1] = q[1]; col[i * 3 + 2] = q[2]; } }
   }
 }
 const CODE_COL = [[.62, .67, .78], [.9, .36, .5], [.55, .82, .5], [.96, .76, .32], [.42, .62, .98], [.38, .43, .53]]; let CODE_AT = 0;
+const CODE_CSS = CODE_COL.map(q => 'rgb(' + q.map(v => Math.round(v * 255)).join(',') + ')'), MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
 function loadCode() {                        // colour this page's own script so it can scroll under the picture
   const re = /(\/\/.*$)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b(const|let|var|function|for|if|else|return|new|while|of|async|await|try|catch|throw|continue)\b|\b(\d+(?:\.\d+)?)\b|([A-Za-z_$][\w$]*)(?=\()/g;
   CODE = document.currentScript.textContent.split('\n').map(l => l.replace(/\s+$/, '').slice(0, 220)).filter(l => l.trim()).map(t => { const c = new Uint8Array(t.length); let m; re.lastIndex = 0;
@@ -1011,6 +1022,10 @@ function loadCode() {                        // colour this page's own script so
 loadCode();
 
 // ================================================================ DRAW THE GRID ONTO THE CANVAS
+const GLOW = new Map(), bokehP = new Float32Array(12 * 5); let BOKEH = null; { const RB = rng(31); for (let i = 0; i < bokehP.length; i++) bokehP[i] = RB(); }
+function glowSprite(r, g, b, R, a, core) {    // a soft round glow: full strength out to `core` of the radius, then fading to nothing
+  const c = document.createElement('canvas'); c.width = c.height = 2 * R; const x = c.getContext('2d'), gr = x.createRadialGradient(R, R, 0, R, R, R), q = 'rgba(' + r + ',' + g + ',' + b + ',';
+  gr.addColorStop(0, q + a + ')'); gr.addColorStop(core, q + a * (core > 0.5 ? 1 : 0.4) + ')'); gr.addColorStop(1, q + '0)'); x.fillStyle = gr; x.fillRect(0, 0, 2 * R, 2 * R); return c; }
 function paint() {
   px32.fill(0xFF000000 | BG[2] << 16 | BG[1] << 8 | BG[0]);
   if (panelBase < H) px32.fill(0xFF000000 | 30 << 16 | 15 << 8 | 12, (OY + panelBase * CH) * PW);          // code panel sits on a slightly lighter strip
@@ -1028,6 +1043,36 @@ function paint() {
         data[o] = b0 + (r - b0) * f; data[o + 1] = b1 + (gg - b1) * f; data[o + 2] = b2 + (b - b2) * f; } }
   }
   ctx.putImageData(img, 0, 0);
+  const T = S.tt || 0, m = Math.min(PW, PH), top = panelBase < H ? OY + panelBase * CH : PH;
+  // light: a few soft out-of-focus glows drifting in the dark, then a real glow on every bulb
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, top); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
+  if (!BOKEH) BOKEH = [[255, 214, 107], [255, 96, 96], [120, 165, 255], [96, 220, 140], [235, 238, 255]].map(q => glowSprite(q[0], q[1], q[2], 128, 0.075, 0.72));
+  for (let k = 0; k < 12; k++) { const o = k * 5, R = m * (0.05 + 0.08 * bokehP[o + 2]), x = (((bokehP[o] + 0.012 * T * (bokehP[o + 3] - 0.5)) % 1) + 1) % 1 * PW, y = top * bokehP[o + 1] + m * 0.02 * Math.sin(T * 0.3 + k);
+    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(T * (0.4 + bokehP[o + 4]) + k * 2.1); ctx.drawImage(BOKEH[k % BOKEH.length], x - R, y - R, 2 * R, 2 * R); }
+  ctx.globalAlpha = 1; const GR = Math.round(CW * 3.0);
+  for (let i = 0, n = W * H; i < n; i++) if (emit[i]) { const j = i * 3, r = Math.min(7, col[j] * 7 + .5 | 0), g = Math.min(7, col[j + 1] * 7 + .5 | 0), b = Math.min(7, col[j + 2] * 7 + .5 | 0), key = r << 6 | g << 3 | b;
+    let sp = GLOW.get(key); if (!sp) { sp = glowSprite(r * 36, g * 36, b * 36, GR, 0.34, 0.3); GLOW.set(key, sp); }
+    ctx.drawImage(sp, OX + (i % W) * CW + CW / 2 - GR, OY + ((i / W) | 0) * CH + CH / 2 - GR); }
+  ctx.restore();
+  // words people need to read are drawn in a real font: the site address, the status lines, the code
+  ctx.textBaseline = 'middle';
+  if (stamp) { ctx.font = '700 ' + stamp.fs + 'px ' + MONO; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(244,246,255,0.95)'; ctx.fillText(siteLabel(), PW / 2, stamp.y); }
+  if (S.capText && S.capText.n > 0) { const c = S.capText; let left = c.n; ctx.font = '800 ' + c.fs + 'px ' + MONO; ctx.textAlign = 'left'; ctx.fillStyle = '#ffd66b'; ctx.shadowColor = 'rgba(255,196,72,0.6)'; ctx.shadowBlur = c.fs * 0.35;
+    c.lines.forEach((l, i) => { if (left > 0) ctx.fillText(l.slice(0, left), PW / 2 - ctx.measureText(l).width / 2, c.y + i * c.fs * 1.2); left -= l.length; }); ctx.shadowBlur = 0; }
+  ctx.textAlign = 'left';
+  if (S.hud) { const fs = Math.round(m * 0.024), lh = Math.round(fs * 1.45), pad = Math.round(fs * 0.8), y0 = top - lh * 3 - pad * 0.6; ctx.font = fs + 'px ' + MONO;
+    const w = Math.max(...S.hud.map(h => ctx.measureText(h).width)); ctx.fillStyle = 'rgba(7,9,20,0.62)'; ctx.fillRect(0, y0 - pad * 0.4, w + pad * 2, lh * 3 + pad);
+    ctx.fillStyle = 'rgba(160,172,200,0.95)'; S.hud.forEach((h, k) => ctx.fillText(h, pad, y0 + lh * (k + 0.5))); }
+  if (panelBase < H && CODE) {                                                                             // this page's own source, typing itself
+    const fs = Math.round(m * 0.027), lh = Math.round(fs * 1.5), pad = Math.round(fs * 0.9); ctx.font = fs + 'px ' + MONO;
+    const adv = ctx.measureText('M').width, n = Math.max(1, Math.floor((PH - top - lh * 1.3) / lh)), sc = T * 1.5, first = Math.floor(sc), x0 = pad + adv * 6, maxc = Math.floor((PW - x0 - pad * 0.5) / adv);
+    ctx.fillStyle = 'rgba(123,135,168,0.9)'; ctx.fillText('wrapinlights.js', pad, top + lh * 0.75); ctx.textAlign = 'right'; ctx.fillText("this page's own code", PW - pad, top + lh * 0.75); ctx.textAlign = 'left';
+    for (let v = 0; v < n; v++) { const li = (CODE_AT + first + v) % CODE.length, L = CODE[li], y = top + lh * 1.3 + lh * (v + 0.5), typing = v === n - 1, lim = Math.min(maxc, L.t.length, typing ? Math.floor((sc - first) * 1.4 * L.t.length) : 1e9);
+      if (typing) { ctx.fillStyle = 'rgba(255,214,107,0.08)'; ctx.fillRect(0, y - lh / 2, PW, lh); ctx.fillStyle = '#ffd66b'; ctx.fillRect(0, y - lh / 2, Math.max(3, fs * 0.14), lh); }
+      ctx.fillStyle = typing ? '#c9d1e6' : 'rgb(92,102,134)'; ctx.fillText(String(li + 1).padStart(4), pad, y);
+      for (let k = 0; k < lim;) { const c = L.c[k]; let e = k + 1; while (e < lim && L.c[e] === c) e++; ctx.fillStyle = CODE_CSS[c]; ctx.fillText(L.t.slice(k, e), x0 + k * adv, y); k = e; }
+      if (typing && (T * 2) % 1 < 0.6) { ctx.fillStyle = '#ffd66b'; ctx.fillRect(x0 + lim * adv + 2, y - fs * 0.55, adv * 0.62, fs * 1.1); } }
+  }
 }
 let ema = 16, ticks = 0;
 function loop() {
@@ -1235,7 +1280,7 @@ addEventListener('pointerup', () => { dragX = null; }); addEventListener('pointe
 // ================================================================ START
 // A phone starts with the tall phone shape; anything else starts wide. A link carries a size only if its maker changed it, so each viewer gets the shape that fits their screen.
 const PHONE = /iPhone|iPod|Android.+Mobile|Windows Phone/i.test(navigator.userAgent) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600);
-$('format').value = PHONE ? '1080x1920' : '1920x1080';
+$('format').value = PHONE ? '1080x1920' : '1920x1080'; if (PHONE) $('cell').value = '8';      // and characters big enough to see on a phone
 for (const id of SHARE_IDS) DEFAULTS[id] = val(id);
 const start = new URLSearchParams(location.hash.slice(1));
 for (const id of ['word', 'from', 'caption', 'scene']) if (start.has(id)) $(id).value = start.get(id).slice(0, $(id).maxLength > 0 ? $(id).maxLength : 40);
