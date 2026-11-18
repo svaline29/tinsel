@@ -650,6 +650,28 @@ function makeGlobe(n, r) {                   // a snow globe: a small winter sce
   for (const [y, rad] of [[.07, .78], [.42, .72]]) for (let i = 0; i < 48; i++) { const a = i / 48 * TAU, b = (i + 1) / 48 * TAU; B.segs.push(rad * Math.cos(a), y, rad * Math.sin(a), rad * Math.cos(b), y, rad * Math.sin(b), Math.cos(a), 0, Math.sin(a)); }   // lights round the base
   return finish(B, r, { globe: [0, cy, 0, R, fl + .1] });
 }
+function makeHouse(n, r) {                   // a two-storey house in the snow: lit windows, a wreath on the door, smoke from the chimney
+  const B = builder(), WALL = [.21, .33, .5], TRIM = [.93, .94, .97], GLOW = [1, .82, .36], SNOW = [.93, .96, 1], BAR = [.3, .2, .12], H = 1.45, hw = 1, hd = .65, rise = .77, ov = .1, eave = H - .05;
+  const FRONT = [[-.62, .52, .15, .18], [.62, .52, .15, .18], [-.62, 1.1, .14, .16], [0, 1.1, .14, .16], [.62, 1.1, .14, .16]], BACK = [[-.5, .52, .15, .18], [.5, .52, .15, .18], [-.5, 1.1, .14, .16], [.5, 1.1, .14, .16]], SIDE = [[0, .52, .14, .18], [0, 1.1, .13, .16]];   // windows: centre across, centre up, half width, half height
+  const pane = (a, y, list) => { for (const [cx, cy, w2, h2] of list) { const dx = Math.abs(a - cx), dy = Math.abs(y - cy); if (dx < w2 && dy < h2) return dx > w2 - .03 || dy > h2 - .03 ? TRIM : dx < .014 || dy < .014 ? BAR : GLOW; } return null; };
+  boxEach(Math.floor(n * .4), 0, H / 2, 0, hw * 2, H, hd * 2, r, (x, y, z, nx, ny, nz) => { if (ny) return; let c = null;
+    if (nz > 0 && Math.abs(x) < .16 && y > .05 && y < .68) c = Math.abs(x) > .13 || y > .65 ? TRIM : [.62, .1, .12];                       // the front door
+    else c = nz ? pane(x, y, nz > 0 ? FRONT : BACK) || (Math.abs(x) > hw - .045 ? TRIM : null) : pane(z, y, SIDE) || (Math.abs(z) > hd - .045 ? TRIM : null);
+    put(B, x, y, z, nx, ny, nz, c || WALL, c ? 0 : 1); });
+  for (const sd of [-1, 1]) for (let k = 0; k < n * .035; k++) { const v = Math.sqrt(r()), y = H + (rise - .05) * (1 - v), z = (r() - .5) * 2 * hd * v, attic = Math.hypot(z, y - H - .22) < .1;   // the two end walls under the roof, each with a round attic window
+    put(B, sd * hw, y, z, sd, 0, 0, attic ? GLOW : WALL, attic ? 0 : 1); }
+  for (let k = 0; k < n * .36; k++) { const sd = r() < .5 ? 1 : -1, v = r(), x = (r() - .5) * 2 * (hw + .08); put(B, x, eave + rise * v, sd * (hd + ov) * (1 - v), 0, hd + ov, sd * rise, v < .05 ? [.32, .34, .4] : SNOW, 0); }   // the roof, under snow
+  const chx = .55, chz = -.22, cht = H + 1; boxEach(Math.floor(n * .04), chx, H + .62, chz, .22, .76, .22, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, ny > 0 || y > cht - .05 ? SNOW : [.58, .23, .18], 0));
+  boxEach(Math.floor(n * .015), 0, .03, hd + .1, .46, .06, .2, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, ny > 0 ? SNOW : [.5, .5, .55], 0));       // the step
+  for (const sd of [-1, 1]) sphereEach(Math.floor(n * .03), sd * .42, .15, hd + .17, .17, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, ny > .35 ? SNOW : [.12, .42, .2], 0));   // a bush each side of the door
+  for (let k = 0; k < n * .01; k++) { const a = r() * TAU, b = r() * TAU, q = .022; put(B, (.075 + q * Math.cos(b)) * Math.cos(a), .47 + (.075 + q * Math.cos(b)) * Math.sin(a), hd + .012 + q * Math.sin(b) * .6, Math.cos(b) * Math.cos(a), Math.cos(b) * Math.sin(a), 1, k % 9 ? [.1, .5, .2] : [.9, .12, .12], 0); }   // the wreath
+  for (const [x, y] of FRONT) B.lamps.push([x, y, hd + .02, 1, .8, .34]); for (const [x, y] of BACK) B.lamps.push([x, y, -hd - .02, 1, .8, .34]); for (const sd of [-1, 1]) { for (const [z, y] of SIDE) B.lamps.push([sd * (hw + .02), y, z, 1, .8, .34]); B.lamps.push([sd * (hw + .02), H + .22, 0, 1, .8, .34]); }
+  B.lamps.push([0, .8, hd + .05, 1, .86, .5]);                                                           // the porch light
+  for (const sd of [-1, 1]) { segPath(B, [[-hw - .08, eave, sd * (hd + ov)], [hw + .08, eave, sd * (hd + ov)]], 0, -.2, sd);          // lights along the gutters, up the roof edges, along the ridge, down the corners and round the door
+    for (const sx of [-1, 1]) { segPath(B, [[sx * (hw + .08), eave, sd * (hd + ov)], [sx * (hw + .08), eave + rise, 0]], sx, .3, 0); segPath(B, [[sx * hw, 0, sd * hd], [sx * hw, eave, sd * hd]], sx, 0, sd); } }
+  segPath(B, [[-hw - .08, eave + rise, 0], [hw + .08, eave + rise, 0]], 0, 1, 0); segPath(B, [[-.18, .05, hd], [-.18, .7, hd], [.18, .7, hd], [.18, .05, hd]], 0, 0, 1);
+  return finish(B, r, { steam: [[chx, cht + .04, chz]], solo: true });
+}
 function makePhoto(im, n, r) {               // a picture as a shallow relief: lighter parts stand forward, and every point keeps the picture's colour and the character that matches its brightness
   const sc = Math.min(1, 320 / Math.max(im.width, im.height)), w = Math.max(8, Math.round(im.width * sc)), h = Math.max(8, Math.round(im.height * sc)), big = Math.max(w, h);
   const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
@@ -772,6 +794,7 @@ const PRESETS = {
   hatch:   car('Hatchback', HATCH, '#f2c21a'),
   suv:     car('SUV', CROSSOVER, '#2a62d8'),
   pickup:  car('Pickup', PICKUP, '#e8ecf2'),
+  house:   { label: 'House', make: (n, r) => makeHouse(n, r), topper: false, repaint: true, paint: '#35557f', mode: 'outline', bulbs: 300, tall: true },
   train:   { label: 'Steam train', make: (n, r) => makeTrain(n, r), topper: false, repaint: true, paint: '#0f7a3d', mode: 'outline', car: true, bulbs: 320 },
   jet:     { label: 'Jet',     make: (n, r) => makeJet(n, r),     topper: false, repaint: true,  paint: '#8d99ae', mode: 'outline', scene: 'fly', acro: true, bulbs: 340 },
   sleigh:  { label: 'Sleigh',  make: (n, r) => makeSleigh(n, r),  topper: false, repaint: true,  paint: '#c8102e', mode: 'outline', scene: 'fly' },
@@ -802,7 +825,7 @@ function normalize(src, zUp, quarter, flip) {
   const trail = (src.trail || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
   const steam = (src.steam || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
   let globe = null; if (src.globe) { const q = [0, 0, 0]; fix(src.globe, q, 0); mv(q, 0); globe = [q[0], q[1], q[2], src.globe[3] * s, (src.globe[4] - lo[1]) * s]; }      // where the glass ball is, and where its snow lies
-  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, globe, steam, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
+  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, globe, steam, solo: !!src.solo, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
   if (src.wheel) { d.wheel = src.wheel; const acc = [];
     for (let k = 0; k < n; k++) { const w = src.wheel[k]; if (!w) continue; const q = acc[w - 1] || (acc[w - 1] = [0, 0, 0, 0, -1e9]);
       q[0] += P[k * 3]; q[1] += P[k * 3 + 1]; q[2] += P[k * 3 + 2]; q[3]++; if (P[k * 3 + 1] > q[4]) q[4] = P[k * 3 + 1]; }
@@ -864,6 +887,7 @@ for (let i = 0; i < 1500; i++) snowP.set([R0() * 9, R0() * 5, R0() * 8, R0() * 6
 for (let i = 0; i < 300; i++) starsP.set([R0(), Math.pow(R0(), 1.3), 0.25 + 0.75 * Math.pow(R0(), 2.5), R0() * 6.28, 2.2 * (0.4 + R0()), 0.8 + 0.2 * R0()], i * 6);
 for (let z = -9; z < 4.5; z += 0.32) for (let x = -9; x < 9; x += 0.16) floorP.push(x + gauss(R0) * 0.024, z + gauss(R0) * 0.014, 0.6 + 0.4 * R0(), '..::-='.charCodeAt(Math.floor(R0() * 6)));
 for (let i = 0; i < 140; i++) sprayP.set([R0() * 0.55, 2.0 + R0() * 1.2, 0.8 + R0() * 0.9, gauss(R0) * 0.35, i % 2 ? 1 : -1], i * 5);
+const cloudP = []; { const RC = rng(61); for (let k = 0; k < 11; k++) { const far = k < 6, blobs = []; for (let j = 0; j < 7; j++) blobs.push([(RC() - .5) * 1.6, (RC() - .5) * .4, .4 + .4 * RC(), .28 + .22 * RC()]); cloudP.push({ u: RC(), v: RC(), s: far ? .13 + .06 * RC() : .22 + .1 * RC(), far, blobs }); } }   // clouds for the flying scene: each one is a handful of soft blobs
 const steamP = new Float32Array(260 * 3); { const RS = rng(53); for (let i = 0; i < 780; i++) steamP[i] = gauss(RS); }
 const flakeP = new Float32Array(300 * 4); { const RF = rng(31); for (let i = 0; i < 1200; i++) flakeP[i] = RF(); }
 { const RT = rng(77); for (let i = 0; i < 260; i++) trailP.set([RT(), gauss(RT), gauss(RT), RT()], i * 4); }      // its own dice, so the pines stay where they were
@@ -957,11 +981,11 @@ function frame(t) {
   const d = S.dense, top = d.size[1], aspect = CH / CW, drive = $('scene').value === 'drive', fly = $('scene').value === 'fly', moving = drive || fly, speedV = +$('spin').value;
   const pr = $('code').checked ? Math.max(6, Math.round(H * 0.2)) : 0, base = H - pr, VH = H - pr * 0.8; panelBase = pr ? base : 1e9;   // rows left for the picture
   const mm = Math.min(PW, PH), hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = capBmp ? capBmp.rows * CH2 : 0, capY = Math.round(Math.min(hudTop - mm * 0.025, PH > PW ? PH * 0.8 : 1e9) - capH);   // above the status lines, and above Instagram's reply bar on tall videos
-  const solo = d.lvl || (d.globe && PH >= PW), r0 = stamp ? stamp.r1 + 2 : 2, r1 = Math.max(r0 + 8, Math.floor((capY - OY) / CH) - 1), VC = solo ? (r0 + r1) / 2 : VH / 2;   // a photo or a globe sits between the address and the caption, and fills that space
+  const solo = d.lvl || d.solo || (d.globe && PH >= PW), r0 = stamp ? stamp.r1 + 2 : 2, r1 = Math.max(r0 + 8, Math.floor((capY - OY) / CH) - 1), VC = solo ? (r0 + r1) / 2 : VH / 2;   // a photo or a globe sits between the address and the caption, and fills that space
   const ex = 0, ty = top * (solo ? 0.5 : d.globe ? 0.4 : 0.3) + (fly ? 1.0 : 0), ey = ty + 1.25, ez = 6.6;
   let fy = ty - ey, fz = -ez; const fl = Math.hypot(fy, fz); fy /= fl; fz /= fl;                    // camera looks down -Z, tilted
   const short = Math.min(H, W / aspect), vis = 2 * fl * Math.tan(15 * Math.PI / 180) / short;       // world units per row
-  const fit = solo ? Math.min(0.86 * vis * (W / aspect) / d.size[0], 0.92 * vis * (r1 - r0) / top) : Math.min(0.80 * vis * (W / aspect) / (d.globe ? d.size[0] * 1.02 : Math.hypot(d.size[0], d.size[2])), 0.74 * vis * VH / (top * (moving ? 1.2 : d.globe ? 1.25 : 1.9) + 0.4));
+  const fit = solo ? Math.min(0.86 * vis * (W / aspect) / (d.solo ? Math.hypot(d.size[0], d.size[2]) : d.size[0]), 0.92 * vis * (r1 - r0) / top) : Math.min(0.80 * vis * (W / aspect) / (d.globe ? d.size[0] * 1.02 : Math.hypot(d.size[0], d.size[2])), 0.74 * vis * VH / (top * (moving ? 1.2 : d.globe ? 1.25 : 1.9) + 0.4));
   const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.9 : 1.5) : 1) * +$('zoom').value;
   const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
   const psi = 0.42 + S.drag + (fly ? 0.1 * Math.sin(0.45 * t) : 0), Dx = Math.cos(psi), Dz = Math.sin(psi), dist = moving ? Math.abs(speedV) * (fly ? 26 : 11) * t : 0;   // driving or flying: heading and distance covered
@@ -1039,8 +1063,8 @@ function frame(t) {
       plot(bx - Dx * sprayP[o + 1] * a + Dz * sprayP[o + 3] * a, Math.max(0.02, sprayP[o + 2] * a - 2.25 * a * a), bz - Dz * sprayP[o + 1] * a - Dx * sprayP[o + 3] * a, g, g, g * 1.05, k % 3 ? 46 : 42, 0); }
   }
   if (d.steam.length && !fly && t > 4 * u) { const s0 = d.steam[0], life = 4 * u, cx = M[0] * s0[0] + M[1] * s0[1] + M[2] * s0[2], cy = M[3] * s0[0] + M[4] * s0[1] + M[5] * s0[2] + bob, cz = M[6] * s0[0] + M[7] * s0[1] + M[8] * s0[2];   // steam from the funnel: a puff on every half beat, left behind as the train moves on
-    for (let k = 0; k < 260; k++) { const o = k * 3, a = (t / life + (k % 8) / 8) % 1, sp = 0.05 + 0.42 * a, back = drive ? 3.6 * a : 0.25 * a, g = 1 - 0.6 * a;
-      plot(cx - Dx * back + steamP[o] * sp, cy + 0.05 + 0.85 * Math.sqrt(a) + steamP[o + 1] * sp * 0.55, cz - Dz * back + steamP[o + 2] * sp, g, g, g * 1.03, a < 0.14 ? 64 : a < 0.34 ? 79 : a < 0.58 ? 111 : a < 0.8 ? 58 : 46, 0); } }
+    for (let k = 0; k < 260; k++) { const o = k * 3, a = (t / life + (k % 8) / 8) % 1, sp = drive ? 0.05 + 0.42 * a : 0.03 + 0.2 * a, back = drive ? 3.6 * a : 0.3 * a, g = 1 - 0.6 * a;      // standing still, it only curls upwards
+      plot(cx - Dx * back + steamP[o] * sp, cy + 0.05 + (drive ? 0.85 : 0.5) * Math.sqrt(a) + steamP[o + 1] * sp * 0.55, cz - Dz * back + steamP[o + 2] * sp, g, g, g * 1.03, a < 0.14 ? 64 : a < 0.34 ? 79 : a < 0.58 ? 111 : a < 0.8 ? 58 : 46, 0); } }
   if (d.globe) { const [gx, gy, gz, gr, gf] = d.globe, span = gy + gr * 0.9 - gf;                        // snow swirling inside the glass
     for (let i = 0; i < 300; i++) { const o = i * 4, a = flakeP[o] * TAU + (0.2 + 0.5 * flakeP[o + 3]) * t, rr = gr * 0.9 * Math.sqrt(flakeP[o + 1]), y = gf + wrap(flakeP[o + 2] * span - (0.1 + 0.16 * flakeP[o + 3]) * t, 0, span);
       const x = gx + rr * Math.cos(a), z = gz + rr * Math.sin(a); if ((x - gx) ** 2 + (y - gy) ** 2 + (z - gz) ** 2 > gr * gr * 0.86 || y > grow) continue;
@@ -1070,13 +1094,16 @@ function frame(t) {
     if (chr[i]) { col[j] += halo[j]; col[j + 1] += halo[j + 1]; col[j + 2] += halo[j + 2]; }
     else if (hm > 0.16) { chr[i] = 46; col[j] = halo[j] * 1.6; col[j + 1] = halo[j + 1] * 1.6; col[j + 2] = halo[j + 2] * 1.6; } }
 
-  if (fly) { const mx = W * (tall ? 0.27 : 0.2), my2 = VH * 0.31, R = Math.min(PW, PH) * 0.17, rx = R / CW, ry = R / CH;                            // a moon, behind everything
-    for (let y = Math.max(0, Math.floor(my2 - ry)); y <= Math.min(H - 1, my2 + ry); y++) for (let x = Math.max(0, Math.floor(mx - rx)); x <= Math.min(W - 1, mx + rx); x++) {
-      const dx = (x - mx) / rx, dy = (y - my2) / ry, q = dx * dx + dy * dy, i = y * W + x; if (q > 1 || chr[i]) continue;
-      const l = Math.max(0, -0.45 * dx - 0.35 * dy + 0.82 * Math.sqrt(1 - q)), cr = 0.5 + 0.5 * Math.sin(dx * 7.3 + 1.7) * Math.sin(dy * 6.1 + 0.4) * Math.sin((dx - dy) * 4.2), b = (0.2 + 0.8 * l) * (0.7 + 0.3 * cr);
-      chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(b * nr)))]; col[i * 3] = .68 * b; col[i * 3 + 1] = .67 * b; col[i * 3 + 2] = .56 * b; } }
+  if (fly) {                                                                                           // flying: clouds slide past behind everything, the far ones slower than the near ones
+    const dtc = Math.max(0, Math.min(0.1, t - (S.ct || 0))), dl = Math.hypot(nX, nY) || 1; S.ct = t;
+    S.cdx = S.cdx === undefined ? -nX / dl : S.cdx + (-nX / dl - S.cdx) * 0.03; S.cdy = S.cdy === undefined ? nY / dl : S.cdy + (nY / dl - S.cdy) * 0.03; S.cox = (S.cox || 0) + S.cdx * dtc; S.coy = (S.coy || 0) + S.cdy * dtc;   // they drift away from wherever the nose points
+    for (const c of cloudP) { const sp = c.far ? 0.035 : 0.085, cx = wrap(c.u + S.cox * sp, -0.35, 1.7) * W, cy = wrap(c.v + S.coy * sp * (W / aspect / VH), -0.3, 1.6) * VH, sx = c.s * W, sy = sx / aspect * 0.6, lum = c.far ? 0.6 : 1;
+      for (let y = Math.max(0, Math.floor(cy - sy * 0.8)); y <= Math.min(base - 1, cy + sy * 0.8); y++) for (let x = Math.max(0, Math.floor(cx - sx * 1.3)); x <= Math.min(W - 1, cx + sx * 1.3); x++) { const i = y * W + x; if (chr[i]) continue; let dn = 0;
+        for (const q of c.blobs) { const ax = (x - cx - q[0] * sx) / (q[2] * sx), ay = (y - cy - q[1] * sy) / (q[3] * sy), e = ax * ax + ay * ay; if (e < 1) dn += (1 - e) * (1 - e); }
+        if (dn < 0.1) continue; dn = Math.min(1, dn); const g = (0.2 + 0.42 * dn) * (0.7 + 0.3 * Math.max(0, Math.min(1, (cy - y) / sy + 0.4))) * lum;                  // a little brighter on top
+        chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(dn * 0.7 * nr)))]; col[i * 3] = g * 0.82; col[i * 3 + 1] = g * 0.9; col[i * 3 + 2] = g * 1.12; } } }
   // stars (only where the sky is empty)
-  if ($('stars').checked) for (let k = 0; k < 300; k++) { const o = k * 6, x = Math.floor(starsP[o] * W), y = Math.floor(starsP[o + 1] * VH * (drive ? 0.45 : 0.58)), i = y * W + x;
+  S.fly = fly; if ($('stars').checked && !fly) for (let k = 0; k < 300; k++) { const o = k * 6, x = Math.floor(starsP[o] * W), y = Math.floor(starsP[o + 1] * VH * (drive ? 0.45 : 0.58)), i = y * W + x;
     if (chr[i]) continue; const b = starsP[o + 2] * (0.55 + 0.45 * Math.sin(starsP[o + 4] * t + starsP[o + 3])), g = 0.3 + 0.7 * b, tn = starsP[o + 5];
     chr[i] = b > 0.62 ? 42 : b > 0.34 ? 43 : 46; col[i * 3] = g * tn; col[i * 3 + 1] = g * tn; col[i * 3 + 2] = g; }
 
@@ -1140,7 +1167,7 @@ function paint() {
   // light: a few soft out-of-focus glows drifting in the dark, then a real glow on every bulb
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, PW, top); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
   if (!BOKEH) BOKEH = [[255, 214, 107], [255, 96, 96], [120, 165, 255], [96, 220, 140], [235, 238, 255]].map(q => glowSprite(q[0], q[1], q[2], 128, 0.075, 0.72));
-  for (let k = 0; k < 12; k++) { const o = k * 5, R = m * (0.05 + 0.08 * bokehP[o + 2]), x = (((bokehP[o] + 0.012 * T * (bokehP[o + 3] - 0.5)) % 1) + 1) % 1 * PW, y = top * bokehP[o + 1] + m * 0.02 * Math.sin(T * 0.3 + k);
+  if (!S.fly) for (let k = 0; k < 12; k++) { const o = k * 5, R = m * (0.05 + 0.08 * bokehP[o + 2]), x = (((bokehP[o] + 0.012 * T * (bokehP[o + 3] - 0.5)) % 1) + 1) % 1 * PW, y = top * bokehP[o + 1] + m * 0.02 * Math.sin(T * 0.3 + k);
     ctx.globalAlpha = 0.55 + 0.45 * Math.sin(T * (0.4 + bokehP[o + 4]) + k * 2.1); ctx.drawImage(BOKEH[k % BOKEH.length], x - R, y - R, 2 * R, 2 * R); }
   ctx.globalAlpha = 1; const GR = Math.round(CW * 3.0);
   for (let i = 0, n = W * H; i < n; i++) if (emit[i]) { const j = i * 3, r = Math.min(7, col[j] * 7 + .5 | 0), g = Math.min(7, col[j + 1] * 7 + .5 | 0), b = Math.min(7, col[j + 2] * 7 + .5 | 0), key = r << 6 | g << 3 | b;
@@ -1352,7 +1379,7 @@ const goTall = on => { if (on) { if ($('format').value === '1920x1080') { S.fmtW
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
   const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; fineCells(false); S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
-  if (p.word) { if (was !== p) goTall(true); } else goTall(false);
+  if (p.word || p.tall) { if (was !== p) goTall(true); } else goTall(false);
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
 async function loadPhoto(file) {
@@ -1438,7 +1465,7 @@ const THUMBS = [];                            // tile pictures are drawn a momen
 const tile = (k, label, fn, draw) => { const b = document.createElement('button'), c = document.createElement('canvas'); c.width = 168; c.height = 112; b.className = 'tile'; b.dataset.k = k; b.onclick = fn;
   b.append(c, label); $('gallery').appendChild(b); THUMBS.push(() => draw(c)); return c; };
 tile('text', 'A word', () => { usePreset('text'); $('word').focus(); }, c => presetThumb(c, { make: (n, r) => makeText('ABC', n, r), repaint: true, paint: '#d41a1f' }, -0.3));
-for (const k of ['train', 'globe', 'coupe', 'sedan', 'hatch', 'suv', 'pickup', 'jet', 'sleigh', 'tree', 'rocket', 'snowman', 'gift']) { const p = PRESETS[k]; tile(k, p.label, () => usePreset(k), c => presetThumb(c, p)); }
+for (const k of ['train', 'globe', 'coupe', 'sedan', 'hatch', 'suv', 'pickup', 'house', 'jet', 'sleigh', 'tree', 'rocket', 'snowman', 'gift']) { const p = PRESETS[k]; tile(k, p.label, () => usePreset(k), c => presetThumb(c, p)); }
 const photoTile = tile('photo', 'Your photo', () => $('photo').click(), photoThumb);
 const fileTile = tile('file', 'Your 3D file', () => $('file').click(), plusThumb);
 const SWATCHES = { Red: '#d41a1f', Green: '#0f7a3d', Blue: '#2a62d8', Yellow: '#f2c21a', Orange: '#ff7a1a', Pink: '#ff5fa2', White: '#f2f2f6', Silver: '#c2c8d2', Black: '#14161c' };
