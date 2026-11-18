@@ -954,10 +954,12 @@ function turn(yaw, bank, pitch, f) {         // a 3x3 rotation: line the nose up
 function frame(t) {
   const d = S.dense, top = d.size[1], aspect = CH / CW, drive = $('scene').value === 'drive', fly = $('scene').value === 'fly', moving = drive || fly, speedV = +$('spin').value;
   const pr = $('code').checked ? Math.max(6, Math.round(H * 0.2)) : 0, base = H - pr, VH = H - pr * 0.8; panelBase = pr ? base : 1e9;   // rows left for the picture
-  const ex = 0, ty = top * (d.lvl ? 0.5 : d.globe ? 0.4 : 0.3) + (fly ? 1.0 : 0), ey = ty + 1.25, ez = 6.6;
+  const mm = Math.min(PW, PH), hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = capBmp ? capBmp.rows * CH2 : 0, capY = Math.round(Math.min(hudTop - mm * 0.025, PH > PW ? PH * 0.8 : 1e9) - capH);   // above the status lines, and above Instagram's reply bar on tall videos
+  const solo = d.lvl || (d.globe && PH >= PW), r0 = stamp ? stamp.r1 + 2 : 2, r1 = Math.max(r0 + 8, Math.floor((capY - OY) / CH) - 1), VC = solo ? (r0 + r1) / 2 : VH / 2;   // a photo or a globe sits between the address and the caption, and fills that space
+  const ex = 0, ty = top * (solo ? 0.5 : d.globe ? 0.4 : 0.3) + (fly ? 1.0 : 0), ey = ty + 1.25, ez = 6.6;
   let fy = ty - ey, fz = -ez; const fl = Math.hypot(fy, fz); fy /= fl; fz /= fl;                    // camera looks down -Z, tilted
   const short = Math.min(H, W / aspect), vis = 2 * fl * Math.tan(15 * Math.PI / 180) / short;       // world units per row
-  const fit = Math.min(0.80 * vis * (W / aspect) / (d.lvl ? d.size[0] * 0.98 : d.globe ? d.size[0] * 1.02 : Math.hypot(d.size[0], d.size[2])), 0.74 * vis * VH / (top * (moving ? 1.2 : d.lvl ? 1.05 : d.globe ? 1.25 : 1.9) + 0.4));
+  const fit = solo ? Math.min(0.86 * vis * (W / aspect) / d.size[0], 0.92 * vis * (r1 - r0) / top) : Math.min(0.80 * vis * (W / aspect) / (d.globe ? d.size[0] * 1.02 : Math.hypot(d.size[0], d.size[2])), 0.74 * vis * VH / (top * (moving ? 1.2 : d.globe ? 1.25 : 1.9) + 0.4));
   const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.9 : 1.5) : 1) * +$('zoom').value;
   const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
   const psi = 0.42 + S.drag + (fly ? 0.1 * Math.sin(0.45 * t) : 0), Dx = Math.cos(psi), Dz = Math.sin(psi), dist = moving ? Math.abs(speedV) * (fly ? 26 : 11) * t : 0;   // driving or flying: heading and distance covered
@@ -975,7 +977,7 @@ function frame(t) {
 
   const plot = (x, y, z, r, g, b, glyph, em) => {
     const dy = y - ey, dz = z - ez, zc = dy * fy + dz * fz; if (zc < 0.05) return;
-    const sx = Math.floor(W / 2 + x / zc * F * aspect), sy = Math.floor(VH / 2 - (dz * fy - dy * fz) / zc * F);
+    const sx = Math.floor(W / 2 + x / zc * F * aspect), sy = Math.floor(VC - (dz * fy - dy * fz) / zc * F);
     if (sx < 0 || sx >= W || sy < 0 || sy >= H) return;
     const i = sy * W + sx; if (zc >= depth[i] || (soft && chr[i] && tint[i])) return;      // snow never lands on a photo: a flake would punch a dark hole in it
     depth[i] = zc; chr[i] = glyph; emit[i] = em; tint[i] = tileOn; col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b;
@@ -1084,7 +1086,6 @@ function frame(t) {
     (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : fly ? 'airspeed ' + (Math.abs(speedV) * 420).toFixed(0).padStart(3, '0') + ' kt' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs,
     'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas')];                 // drawn by paint() in a real font, so a phone can read them
   const capT = intro ? 12 * u : 5;
-  const mm = Math.min(PW, PH), hudTop = (pr ? OY + base * CH : PH) - mm * 0.024 * 5.2, capH = capBmp ? capBmp.rows * CH2 : 0, capY = Math.round(Math.min(hudTop - mm * 0.025, PH > PW ? PH * 0.8 : 1e9) - capH);   // above the status lines, and above Instagram's reply bar on tall videos
   S.capText = capBmp && t > capT ? { y: capY, upTo: Math.min(capBmp.x1 + 1, Math.ceil((t - capT) * capBmp.cols / 2)) } : null;                    // wiped on from the left; paint() draws it
   if (S.capText && S.capText.upTo > capBmp.x0) { const c0 = Math.max(0, Math.floor((capBmp.x0 * CW2 - OX) / CW) - 1), c1 = Math.min(W - 1, Math.ceil((S.capText.upTo * CW2 - OX) / CW));
     for (let y = Math.max(0, Math.floor((capY - OY) / CH)); y <= Math.min(H - 1, Math.floor((capY + capH - OY) / CH)); y++) for (let x = c0; x <= c1; x++) { const i = y * W + x; chr[i] = 0; emit[i] = 0; halo[i * 3] = halo[i * 3 + 1] = halo[i * 3 + 2] = 0; } }
@@ -1315,15 +1316,17 @@ function useText(str, live) {
   catch (e) { setStatus(e.message || String(e), true); }
 }
 const RAW = {};
+const goTall = () => { if ($('format').value === '1920x1080') setVal('format', '1080x1920'); };      // a photo and the globe are upright things: they start in the tall shape, which they fill
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
   const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
+  if (p.word && was !== p) goTall();
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
 async function loadPhoto(file) {
   try { setStatus('Reading your photo ...'); const url = URL.createObjectURL(file), im = new Image();
     await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('That picture could not be opened. Try a .jpg or .png.')); im.src = url; });
-    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) $('scene').value = 'spin'; markChips();
+    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(); } markChips();
     setModel(raw, 'my photo', first ? { topper: false, repaint: false, mode: 'outline', bulbs: 130 } : null); buildCaption(); track('photo_used', {});
   } catch (e) { setStatus(e.message || String(e), true); }
 }
