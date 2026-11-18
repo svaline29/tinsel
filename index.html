@@ -147,6 +147,8 @@
     #actions { padding-top:8px; padding-bottom:calc(9px + env(safe-area-inset-bottom)); } button.go { padding:12px 8px; }
   }
   /* ---- the new phone layout: the picture fills the screen, icons down the right open a sheet of choices */
+  #statsBox { position:fixed; left:50%; top:50%; transform:translate(-50%, -50%); z-index:30; width:min(92vw, 430px); max-height:86vh; overflow:auto; padding:18px; background:var(--panel); border:1px solid var(--hot); border-radius:14px; box-shadow:0 20px 70px rgba(0,0,0,.8); }
+  #statsBox b { font-size:15px; color:#fff; } #statsBox pre { margin:12px 0 14px; font:inherit; color:var(--ink); white-space:pre-wrap; }
   body.m2 { overflow:hidden; }
   body.m2 main { display:block; height:100vh; height:100dvh; }
   body.m2 aside, body.m2 #hint, body.m2 #drop { display:none; }
@@ -1363,11 +1365,21 @@ function track(name, props) {
   if (TALLIES[name]) { tally(TALLIES[name]); if (name === 'video_made' && props && props.shape) tally('video_' + String(props.shape).replace(/[^a-z0-9]/gi, '')); }
   try { window.va('event', { name, data: props }); if (window.plausible) window.plausible(name, { props }); else if (window.umami) window.umami.track(name, props); } catch (e) {} }
 let errSeen = 0; for (const ev of ['error', 'unhandledrejection']) addEventListener(ev, () => { if (errSeen++ < 3) tally('error'); });       // something broke on someone's device: count it, so a bad update shows up
-async function showCounts(all) {             // how many have been made so far (the address ending in #stats shows the full list)
-  const box = $('counts'), read = async k => { try { const r = await fetch(TALLY + '/get/' + SITE + '/' + k); return r.ok ? (await r.json()).value : 0; } catch (e) { return null; } };
-  if (!all) { const v = await read('video'), l = await read('link'); if (v !== null && v + (l || 0) > 0) box.textContent = 'Made here so far: ' + v.toLocaleString() + ' videos and ' + (l || 0).toLocaleString() + ' links.'; return; }
-  const keys = ['visit', 'video', 'link', 'card_view', 'make_own', 'photo', 'upload', 'in_app', 'error'].concat(['text', 'photo', 'file'].concat(Object.keys(PRESETS)).map(k => 'video_' + k)), out = [];
-  box.style.whiteSpace = 'pre'; for (const k of keys) { const v = await read(k); out.push(k.padEnd(16) + (v === null ? '?' : v)); box.textContent = out.join('\n'); }
+const readCount = async k => { try { const r = await fetch(TALLY + '/get/' + SITE + '/' + k); return r.ok ? (await r.json()).value : 0; } catch (e) { return null; } };   // a counter nobody has added to yet reads as nothing
+async function showCounts() {                // one line in "About and privacy"
+  const v = await readCount('video'), l = await readCount('link'); if (v !== null && v + (l || 0) > 0) $('counts').textContent = 'Made here so far: ' + v.toLocaleString() + ' videos and ' + (l || 0).toLocaleString() + ' links.';
+}
+async function showStats() {                 // every number, in a box on top of the page: put #stats on the end of the address
+  let box = $('statsBox'); if (!box) { box = document.createElement('div'); box.id = 'statsBox'; box.innerHTML = '<b>Made here so far</b><pre id="statsList">counting ...</pre><button id="statsAgain">Count again</button> <button id="statsClose">Close</button>'; document.body.appendChild(box);
+    box.querySelector('#statsClose').onclick = () => { box.remove(); history.replaceState(null, '', location.href.split('#')[0]); }; box.querySelector('#statsAgain').onclick = showStats; }
+  const names = { visit: 'Page loads', video: 'Videos made', link: 'Links made', card_view: 'Cards opened', make_own: 'Card viewers who made one', photo: 'Photos used', upload: '3D files used', in_app: 'Opened inside an app', error: 'Script errors' };
+  const shapes = ['text', 'photo', 'file'].concat(Object.keys(PRESETS)), list = box.querySelector('#statsList'), line = (t, v) => t.padEnd(28) + (v === null ? '?' : v.toLocaleString());
+  const main = await Promise.all(Object.keys(names).map(readCount));                                     // the main numbers first, so they show straight away
+  if (main.every(v => v === null)) { list.textContent = 'The counter could not be reached from this browser.\nAn ad blocker can cause that.'; return; }
+  const top = Object.values(names).map((t, i) => line(t, main[i])).join('\n'), tail = '\n\nCounting began 17 November, 10:40 pm.'; list.textContent = top + '\n\nVideos by shape\n  counting ...' + tail;
+  const per = []; for (let i = 0; i < shapes.length; i += 6) per.push(...await Promise.all(shapes.slice(i, i + 6).map(k => readCount('video_' + k))));
+  const by = shapes.map((k, i) => [k === 'text' ? 'A word' : k === 'photo' ? 'Your photo' : k === 'file' ? 'Your 3D file' : PRESETS[k].label, per[i] || 0]).filter(q => q[1] > 0).sort((p, q) => q[1] - p[1]);
+  list.textContent = top + '\n\nVideos by shape\n' + (by.length ? by.map(q => line('  ' + q[0], q[1])).join('\n') : '  none yet') + tail;
 }
 const LOOKS = {
   classic: { label: 'Classic',  palette: 'xmas',     ramp: ' .:-=+*#%@', paint: '#d41a1f' },
@@ -1606,12 +1618,12 @@ function mobileUI() {
   if (document.body.classList.contains('m2')) return;
   const lab = id => $(id).closest('label'), box = (...els) => { const d = document.createElement('div'); d.className = 'btns'; d.append(...els); return d; }, head = t => { const h = document.createElement('h2'); h.textContent = t; return h; };
   const cats = [                              // each icon, and the controls that live behind it
-    ['shape', 'Shape', [$('gallery'), $('wordRow'), $('modelBox'), document.querySelector('aside details.help')]],
+    ['shape', 'Item', [$('gallery'), $('wordRow'), $('modelBox'), document.querySelector('aside details.help')]],
     ['colour', 'Colour', [$('swatches'), lab('repaint'), head('Themes'), $('looks')]],
     ['lights', 'Lights', ['palette', 'mode', 'bulbs', 'blink', 'turns', 'axis', 'topper'].map(lab)],
     ['scene', 'Scene', [$('scenes')].concat(['spin', 'zoom', 'snow', 'stars', 'mirror', 'acro', 'intro'].map(lab))],
     ['sound', 'Sound', [$('tunes'), $('tuneNote'), $('popBox'), $('musicBox'), lab('bpm')]],
-    ['words', 'Words', [$('from').closest('.cols')]],
+    ['words', 'Captions', [$('from').closest('.cols')]],
     ['style', 'Style', [box($('shuffle')), lab('cell'), lab('ramp'), lab('codeMain')]],
     ['more', 'More', [head('Video size'), $('sizes'), lab('secs'), lab('points'), box($('replay'), $('png')), $('about')]],
   ];
@@ -1620,7 +1632,7 @@ function mobileUI() {
   const body = sheet.querySelector('#sheetBody'), fit = () => document.body.style.setProperty('--m2b', (document.body.classList.contains('m2open') ? sheet.offsetHeight : $('actions').offsetHeight) + 'px');
   const open = k => { const was = document.body.classList.contains('m2open') && body.querySelector('.cat.on') && body.querySelector('.cat.on').dataset.cat; k = k === was ? '' : k;      // tapping the same icon again closes it
     document.body.classList.toggle('m2open', !!k); for (const c of body.children) c.classList.toggle('on', c.dataset.cat === k); for (const b of rail.children) b.classList.toggle('on', b.dataset.cat === k);
-    if (k) { sheet.querySelector('#sheetTitle').textContent = cats.find(c => c[0] === k)[1]; body.scrollTop = 0; } fit(); };
+    if (k) { sheet.querySelector('#sheetTitle').textContent = k === 'shape' ? 'What to wrap in lights' : cats.find(c => c[0] === k)[1]; body.scrollTop = 0; } fit(); };
   for (const [k, title, els] of cats) { const c = document.createElement('div'); c.className = 'cat'; c.dataset.cat = k; c.append(...els.filter(Boolean)); body.appendChild(c);
     const b = document.createElement('button'); b.dataset.cat = k; b.setAttribute('aria-label', title); b.innerHTML = '<i><svg viewBox="0 0 24 24">' + ICONS[k] + '</svg></i>' + title; b.onclick = () => open(k); rail.appendChild(b); }
   document.body.classList.add('m2'); $('custom').open = true; $('stage').append(rail, tip); document.body.append(sheet, $('actions')); sheet.querySelector('#sheetDone').onclick = () => open('');
@@ -1647,8 +1659,9 @@ if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = 
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 tally('visit');
 if (M2 && !S.viewer) try { mobileUI(); } catch (e) { document.body.classList.remove('m2', 'm2open'); }
-$('about').addEventListener('toggle', e => { if (e.target.open && !$('counts').textContent) showCounts(false); });
-if (start.has('stats')) { $('about').open = true; showCounts(true); }
+$('about').addEventListener('toggle', e => { if (e.target.open && !$('counts').textContent) showCounts(); });
+if (start.has('stats')) showStats();
+addEventListener('hashchange', () => { if (location.hash === '#stats') showStats(); });       // typed onto the address of a page that is already open
 requestAnimationFrame(loop);
 setTimeout(function next() { const f = THUMBS.shift(); if (!f) return; try { f(); } catch (e) {} setTimeout(next, 16); }, 80);
 </script>
