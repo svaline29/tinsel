@@ -206,7 +206,7 @@
 
     <h2>Sound</h2>
     <div class="btns" id="tunes"></div>
-    <p class="note" id="tuneNote">The tune goes into the video you download, and the lights keep time with it.</p>
+    <p class="note" id="tuneNote">The tune goes into the video you download, and the lights keep time with it. Cannot hear it? Check that your phone is not on silent.</p>
     <details class="help" id="popBox"><summary>Want a pop song, like Last Christmas?</summary>
       A pop song cannot go into the video from here. Pick one to time the lights to it and hear a preview, then add the song with the music button in Instagram or TikTok when you post.
       <div class="btns" id="songs"></div>
@@ -732,7 +732,7 @@ function makeTrain(n, r) { const B = builder(), BODY = [.1, .45, .22], BLACK = [
   segBox(B, -1.05, 1.36, 0, 1.15, 1.48, 1.5); segBox(B, -2.3, 1.0, 0, 1.2, .9, 1.24);
   for (const sz of [1, -1]) { segPath(B, [[-2.9, .64, sz * .6], [2.3, .64, sz * .6]], 0, .3, sz);
     for (const x of [-.15, .78, 1.71]) segPath(B, Array.from({ length: 9 }, (_, i) => { const a = .3 + (Math.PI - .6) * i / 8; return [x + .5 * Math.cos(a), .44 + .5 * Math.sin(a), sz * .74]; }), 0, 0, sz); }
-  return finish(B, r, { fwd: [1, 0, 0] });
+  return finish(B, r, { fwd: [1, 0, 0], steam: [[1.95, 2.3, 0]] });
 }
 function makeSleigh(n, r) { const B = builder(), RED = [.8, .1, .14], GOLD = [1, .8, .3], SACK = [.5, .3, .14];
   const tub = skin(B, [[-1.3, .44, .62, 1.62, 5], [-1.12, .56, .46, 1.70, 5], [-.7, .6, .38, 1.2, 5], [-.1, .6, .36, .98, 5], [.5, .58, .38, 1.0, 5], [.9, .52, .50, 1.22, 5], [1.15, .42, .74, 1.5, 4], [1.3, .26, 1.1, 1.6, 3]],
@@ -800,8 +800,9 @@ function normalize(src, zUp, quarter, flip) {
   const la = size[0] >= size[2] ? 0 : 2; let fwd = [0, 0, 0]; if (src.fwd) fix(src.fwd, fwd, 0); else fwd[la] = 1;
   if (flip) { fwd[0] = -fwd[0]; fwd[2] = -fwd[2]; }
   const trail = (src.trail || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
+  const steam = (src.steam || []).map(l => { const q = [0, 0, 0]; fix(l, q, 0); mv(q, 0); return q; });
   let globe = null; if (src.globe) { const q = [0, 0, 0]; fix(src.globe, q, 0); mv(q, 0); globe = [q[0], q[1], q[2], src.globe[3] * s, (src.globe[4] - lo[1]) * s]; }      // where the glass ball is, and where its snow lies
-  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, globe, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
+  const d = { P, N, n, tint: src.tint, paint: src.paint, wheel: null, wheels: [], lamps, segs, trail, fire: !!src.fire, sway: !!src.sway, lvl: src.lvl || null, globe, steam, size, inward: inward / n, la, fs: fwd[la] < 0 ? -1 : 1, fwdAngle: Math.atan2(fwd[2], fwd[0]) };
   if (src.wheel) { d.wheel = src.wheel; const acc = [];
     for (let k = 0; k < n; k++) { const w = src.wheel[k]; if (!w) continue; const q = acc[w - 1] || (acc[w - 1] = [0, 0, 0, 0, -1e9]);
       q[0] += P[k * 3]; q[1] += P[k * 3 + 1]; q[2] += P[k * 3 + 2]; q[3]++; if (P[k * 3 + 1] > q[4]) q[4] = P[k * 3 + 1]; }
@@ -853,7 +854,7 @@ function buildLights(d, o) {
 }
 
 // ================================================================ STATE
-const S = { song: '', music: '', kind: '', raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const S = { song: '', music: '', kind: '', cellWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
 let tileOn = 0, soft = 0, tint, depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
@@ -863,6 +864,7 @@ for (let i = 0; i < 1500; i++) snowP.set([R0() * 9, R0() * 5, R0() * 8, R0() * 6
 for (let i = 0; i < 300; i++) starsP.set([R0(), Math.pow(R0(), 1.3), 0.25 + 0.75 * Math.pow(R0(), 2.5), R0() * 6.28, 2.2 * (0.4 + R0()), 0.8 + 0.2 * R0()], i * 6);
 for (let z = -9; z < 4.5; z += 0.32) for (let x = -9; x < 9; x += 0.16) floorP.push(x + gauss(R0) * 0.024, z + gauss(R0) * 0.014, 0.6 + 0.4 * R0(), '..::-='.charCodeAt(Math.floor(R0() * 6)));
 for (let i = 0; i < 140; i++) sprayP.set([R0() * 0.55, 2.0 + R0() * 1.2, 0.8 + R0() * 0.9, gauss(R0) * 0.35, i % 2 ? 1 : -1], i * 5);
+const steamP = new Float32Array(260 * 3); { const RS = rng(53); for (let i = 0; i < 780; i++) steamP[i] = gauss(RS); }
 const flakeP = new Float32Array(300 * 4); { const RF = rng(31); for (let i = 0; i < 1200; i++) flakeP[i] = RF(); }
 { const RT = rng(77); for (let i = 0; i < 260; i++) trailP.set([RT(), gauss(RT), gauss(RT), RT()], i * 4); }      // its own dice, so the pines stay where they were
 for (let v = 0; v < 3; v++) { const n = 3600, P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3); let k = 0;   // roadside pines
@@ -1036,6 +1038,9 @@ function frame(t) {
       const bx = -Dx * half * 0.7 + Dz * sd * wdt, bz = -Dz * half * 0.7 - Dx * sd * wdt, g = 0.9 - a;
       plot(bx - Dx * sprayP[o + 1] * a + Dz * sprayP[o + 3] * a, Math.max(0.02, sprayP[o + 2] * a - 2.25 * a * a), bz - Dz * sprayP[o + 1] * a - Dx * sprayP[o + 3] * a, g, g, g * 1.05, k % 3 ? 46 : 42, 0); }
   }
+  if (d.steam.length && !fly && t > 4 * u) { const s0 = d.steam[0], life = 4 * u, cx = M[0] * s0[0] + M[1] * s0[1] + M[2] * s0[2], cy = M[3] * s0[0] + M[4] * s0[1] + M[5] * s0[2] + bob, cz = M[6] * s0[0] + M[7] * s0[1] + M[8] * s0[2];   // steam from the funnel: a puff on every half beat, left behind as the train moves on
+    for (let k = 0; k < 260; k++) { const o = k * 3, a = (t / life + (k % 8) / 8) % 1, sp = 0.05 + 0.42 * a, back = drive ? 3.6 * a : 0.25 * a, g = 1 - 0.6 * a;
+      plot(cx - Dx * back + steamP[o] * sp, cy + 0.05 + 0.85 * Math.sqrt(a) + steamP[o + 1] * sp * 0.55, cz - Dz * back + steamP[o + 2] * sp, g, g, g * 1.03, a < 0.14 ? 64 : a < 0.34 ? 79 : a < 0.58 ? 111 : a < 0.8 ? 58 : 46, 0); } }
   if (d.globe) { const [gx, gy, gz, gr, gf] = d.globe, span = gy + gr * 0.9 - gf;                        // snow swirling inside the glass
     for (let i = 0; i < 300; i++) { const o = i * 4, a = flakeP[o] * TAU + (0.2 + 0.5 * flakeP[o + 3]) * t, rr = gr * 0.9 * Math.sqrt(flakeP[o + 1]), y = gf + wrap(flakeP[o + 2] * span - (0.1 + 0.16 * flakeP[o + 3]) * t, 0, span);
       const x = gx + rr * Math.cos(a), z = gz + rr * Math.sin(a); if ((x - gx) ** 2 + (y - gy) ** 2 + (z - gz) ** 2 > gr * gr * 0.86 || y > grow) continue;
@@ -1120,7 +1125,7 @@ function paint() {
       const v = 0xFF000000 | (b2 << 16) | (b1 << 8) | (b0 | 0); for (let y = 0; y < CH; y++) px32.fill(v, (y0 + y) * PW + x0, (y0 + y) * PW + x0 + CW); }
     if (!g) continue; const a = atlas[g]; if (!a) continue;
     const r = Math.min(255, col[j] * 255), gg = Math.min(255, col[j + 1] * 255), b = Math.min(255, col[j + 2] * 255);
-    if (tint[i]) { b0 += (r - b0) * 0.3; b1 += (gg - b1) * 0.3; b2 += (b - b2) * 0.3; const v = 0xFF000000 | (b2 << 16) | (b1 << 8) | (b0 | 0); for (let y = 0; y < CH; y++) px32.fill(v, (y0 + y) * PW + x0, (y0 + y) * PW + x0 + CW); }   // a photo: each character sits on a faint patch of its own colour, so the picture reads from a distance
+    if (tint[i]) { b0 += (r - b0) * 0.44; b1 += (gg - b1) * 0.44; b2 += (b - b2) * 0.44; const v = 0xFF000000 | (b2 << 16) | (b1 << 8) | (b0 | 0); for (let y = 0; y < CH; y++) px32.fill(v, (y0 + y) * PW + x0, (y0 + y) * PW + x0 + CW); }   // a photo: each character sits on a faint patch of its own colour, so the picture reads from a distance
     for (let y = 0; y < CH; y++) { let o = ((y0 + y) * PW + x0) * 4, k = y * CW;
       for (let x = 0; x < CW; x++, o += 4, k++) { const al = a[k]; if (!al) continue; const f = al / 255;
         data[o] = b0 + (r - b0) * f; data[o + 1] = b1 + (gg - b1) * f; data[o + 2] = b2 + (b - b2) * f; } }
@@ -1179,7 +1184,7 @@ function loop() {
 // Carols old enough that anyone may use them, played by the page itself. That is what lets the sound go into the video and the lights keep exact time with it.
 const notes = str => str.trim().split(/\s+/).map(q => { const [p, d] = q.split(':'); return [p, +d]; });       // 'E4:1 G4:.5' means E4 for one beat, then G4 for half a beat; '-' is a rest
 const hz = n => { const m = /^([A-G])(#|b)?(\d)$/.exec(n), k = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); return 440 * Math.pow(2, (k + 12 * (+m[3] + 1) - 69) / 12); };
-const CHORD = { C: ['C3', 'E4', 'G4', 'C5'], F: ['F3', 'F4', 'A4', 'C5'], G: ['G3', 'D4', 'G4', 'B4'], D: ['D3', 'D4', 'F#4', 'A4'] };       // bass note, then three notes to strum
+const CHORD = { C: ['C3', 'E4', 'G4', 'C5'], F: ['F3', 'F4', 'A4', 'C5'], G: ['G3', 'D4', 'G4', 'B4'], D: ['D3', 'D4', 'F#4', 'A4'] };       // bass note, then the three notes of the chord
 const DECK = 'G4:1.5 F4:.5 E4:1 D4:1 C4:1 D4:1 E4:1 C4:1 D4:.5 E4:.5 F4:.5 D4:.5 E4:1.5 D4:.5 C4:1 B3:1 C4:2 ', JING = 'E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 ';
 const TUNES = {
   jingle: { label: 'Jingle Bells', bpm: 120, meter: 4, chords: 'C C C C F C D G C C C C F C G C',
@@ -1188,46 +1193,72 @@ const TUNES = {
     melody: DECK + DECK + 'D4:1.5 E4:.5 F4:1 D4:1 E4:1.5 F4:.5 G4:1 D4:1 E4:.5 F#4:.5 G4:1 A4:.5 B4:.5 C5:1 B4:1 A4:1 G4:2 G4:1.5 F4:.5 E4:1 D4:1 C4:1 D4:1 E4:1 C4:1 A4:.5 A4:.5 A4:.5 A4:.5 G4:1.5 F4:.5 E4:1 D4:1 C4:2' },
   bells: { label: 'Carol of the Bells', bpm: 180, meter: 3 },
 };
-for (const T of Object.values(TUNES)) {                                    // turn each tune into a list of sounds: [beat, kind, pitch, loudness]
+for (const T of Object.values(TUNES)) {                                    // turn each tune into a list of sounds: [beat, instrument, pitch, loudness, length in beats, only from this beat on]
   const ev = []; let b = 0;
-  if (T.melody) { for (const [p, d] of notes(T.melody)) { if (p !== '-') ev.push([b, 'bell', hz(p) * 2, 0.5]); b += d; }
-    T.chords.split(' ').forEach((c, bar) => { const q = CHORD[c], t = bar * 4; ev.push([t, 'bass', hz(q[0]), 0.5], [t + 2, 'bass', hz(q[0]) * 1.5, 0.36]);
-      for (const off of [1, 3]) for (let i = 1; i < 4; i++) ev.push([t + off, 'pluck', hz(q[i]), 0.1]);
-      for (let k = 0; k < 8; k++) ev.push([t + k / 2, 'shake', 0, k % 2 ? 0.05 : 0.11]); }); }
-  else { const ring = [['Bb4', 0], ['A4', 1], ['Bb4', 1.5], ['G4', 2]], low = ['G2', 'F2', 'Eb2', 'D2'], high = ['D5', 'C5', 'Bb4', 'A4'];      // the four-note bell figure, round and round, with more joining in every four bars
-    for (let bar = 0; bar < 16; bar++) { const t = bar * 3; for (const [p, o] of ring) { ev.push([t + o, 'bell', hz(p) * 2, 0.42]); if (bar >= 8) ev.push([t + o, 'bell', hz(p) * 4, 0.13]); }
-      if (bar >= 4) ev.push([t, 'bass', hz(low[bar % 4]) * 2, 0.6]); if (bar >= 12) ev.push([t, 'bell', hz(high[bar % 4]) * 2, 0.36]);
-      if (bar >= 8) for (let k = 0; k < 3; k++) ev.push([t + k, 'shake', 0, k ? 0.05 : 0.1]); }
+  if (T.melody) {
+    for (const [p, d] of notes(T.melody)) { if (p !== '-') ev.push([b, 'lead', hz(p) * 2, b % 2 ? 0.42 : 0.5], [b, 'lead', hz(p) * 4, 0.09, 0, 12]); b += d; }   // the tune on a celesta, with a glockenspiel an octave up once the caption has landed
+    T.chords.split(' ').forEach((c, bar) => { const q = CHORD[c], t = bar * 4;
+      for (let i = 1; i < 4; i++) ev.push([t, 'pad', hz(q[i]), 0.035, 4]);                               // soft strings holding the chord
+      ev.push([t, 'bass', hz(q[0]), 0.3], [t + 2, 'bass', hz(q[0]) * 1.5, 0.22]);
+      for (let k = 0; k < 8; k++) ev.push([t + k / 2, 'pluck', hz(q[[1, 2, 3, 2][k % 4]]), k % 2 ? 0.05 : 0.035], [t + k / 2, 'shake', 0, k % 4 === 0 ? 0.075 : k % 2 ? 0.03 : 0.055]);   // a harp picking through the chord, and sleigh bells
+      if (bar % 4 === 0) ev.push([t, 'chime', hz(q[0]) * 4, 0.11]); });
+    ev.push([12, 'chime', hz('C5') * 2, 0.14]);                                                          // one more chime as the caption lands
+  } else { const ring = [['Bb4', 0], ['A4', 1], ['Bb4', 1.5], ['G4', 2]], low = ['G2', 'F2', 'Eb2', 'D2'], high = ['D5', 'C5', 'Bb4', 'A4'];      // the four-note bell figure, round and round, with more joining in every four bars
+    for (let bar = 0; bar < 16; bar++) { const t = bar * 3;
+      for (const [p, o] of ring) { ev.push([t + o, 'lead', hz(p) * 2, o ? 0.4 : 0.5]); if (bar >= 8) ev.push([t + o, 'lead', hz(p) * 4, 0.09]); }
+      if (bar % 4 === 0) { for (const p of ['G3', 'Bb3', 'D4']) ev.push([t, 'pad', hz(p), bar ? 0.04 : 0.028, 12]); if (bar) ev.push([t, 'chime', hz('G4') * 2, 0.12]); }
+      if (bar >= 4) ev.push([t, 'bass', hz(low[bar % 4]) * 2, 0.34], [t + 1.5, 'pluck', hz(low[bar % 4]) * 4, 0.05]);
+      if (bar >= 12) ev.push([t, 'lead', hz(high[bar % 4]) * 2, 0.32]);
+      if (bar >= 8) for (let k = 0; k < 3; k++) ev.push([t + k, 'shake', 0, k ? 0.035 : 0.07]); }
     b = 48; }
   T.len = b; T.grid = new Map(); for (const e of ev) { const i = Math.round(e[0] * 4); if (!T.grid.has(i)) T.grid.set(i, []); T.grid.get(i).push(e); }
 }
-const AU = { ctx: null, bus: null, gen: null, rec: null, next: 0, last: 0, hiss: new WeakMap() };
-function auBus(ctx) { const g = ctx.createGain(), c = ctx.createDynamicsCompressor(); g.gain.value = 0.6; g.connect(c); return { in: g, out: c }; }
-function auPlay(ctx, to, e, at) {            // one sound at one moment
-  const tone = (f, type, vol, decay) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.006); g.gain.exponentialRampToValueAtTime(0.0008, at + decay); o.connect(g); g.connect(to); o.start(at); o.stop(at + decay + 0.05); };
-  const [, kind, f, v] = e;
-  if (kind === 'bell') { tone(f, 'sine', v, 1.4); tone(f * 2, 'triangle', v * 0.2, 0.7); tone(f * 3.01, 'sine', v * 0.16, 0.35); }       // a music box
-  else if (kind === 'bass') tone(f, 'triangle', v, 0.55);
-  else if (kind === 'pluck') tone(f, 'triangle', v, 0.3);
-  else { let buf = AU.hiss.get(ctx); if (!buf) { buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate); const d = buf.getChannelData(0), r = rng(4); for (let i = 0; i < d.length; i++) d[i] = 2 * r() - 1; AU.hiss.set(ctx, buf); }   // sleigh bells: a short hiss, kept bright
-    const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(); n.buffer = buf; fl.type = 'bandpass'; fl.frequency.value = 7600; fl.Q.value = 1.4;
-    g.gain.setValueAtTime(v, at); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.09); n.connect(fl); fl.connect(g); g.connect(to); n.start(at); n.stop(at + 0.12); }
+const AU = { ctx: null, bus: null, gen: null, rec: null, next: 0, last: 0, base: 0, off: 0, dirty: false, hiss: new WeakMap() };
+function auBus(ctx) {                        // where the instruments meet: the echo of a hall, then a limiter so nothing distorts
+  const comp = ctx.createDynamicsCompressor(), out = ctx.createGain(), main = ctx.createGain(), room = ctx.createConvolver(), len = Math.floor(ctx.sampleRate * 2.6), ir = ctx.createBuffer(2, len, ctx.sampleRate), r = rng(12);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { const q = i / len; lp += ((2 * r() - 1) * Math.pow(1 - q, 2.6) - lp) * (0.85 - 0.7 * q); d[i] = lp * Math.min(1, i / 600); } }   // the hall is made from hiss that fades and dulls
+  room.buffer = ir; room.connect(main); main.connect(comp); comp.connect(out); out.gain.value = 1.05; comp.threshold.value = -18; comp.knee.value = 10; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.15;
+  const mk = wet => { const g = ctx.createGain(), w = ctx.createGain(); w.gain.value = wet; g.connect(main); g.connect(w); w.connect(room); return g; };
+  return { lead: mk(0.34), pad: mk(0.55), rhy: mk(0.1), out };
 }
+function auPlay(ctx, to, e, at, spb) {       // one note on one instrument, at one exact moment
+  const [beat, kind, f, v, dur] = e, osc = (type, freq, det) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; if (det) o.detune.value = det; return o; };
+  const hit = (peak, a, d) => { const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(peak, at + a); g.gain.exponentialRampToValueAtTime(0.0001, at + a + d); return g; };   // struck, then dying away
+  const pan = (node, where, x) => { if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = x; node.connect(p); p.connect(where); } else node.connect(where); };
+  if (kind === 'lead' || kind === 'chime') {                                                             // celesta and chime: a pure tone, shaken for an instant by a faster one, which is what struck metal sounds like (the chime is two tones a hair apart, so it shimmers)
+    const ch = kind === 'chime', ratio = ch ? 3.5 : 4, len = ch ? 3.2 : 2, m = osc('sine', f * ratio), mg = ctx.createGain();
+    mg.gain.setValueAtTime(f * ratio * (ch ? 1.5 : 1.1), at); mg.gain.exponentialRampToValueAtTime(f * ratio * (ch ? 0.25 : 0.04), at + (ch ? 1.6 : 0.3)); m.connect(mg); m.start(at); m.stop(at + len + 0.1);
+    for (const [det, x, lv] of ch ? [[-3, -0.3, 0.6], [3, 0.3, 0.4]] : [[0, 0, 1]]) { const c = osc('sine', f, det), g = hit(v * lv, 0.004, len); mg.connect(c.frequency); c.connect(g); pan(g, ch ? to.pad : to.lead, x); c.start(at); c.stop(at + len + 0.1); }
+    if (!ch) { const c = osc('sine', f / 2), g = hit(v * 0.2, 0.006, 0.9); c.connect(g); g.connect(to.lead); c.start(at); c.stop(at + 1); }       // and the octave below, for warmth
+  } else if (kind === 'pad') {                                                                           // strings: two slightly out-of-tune tones, softened, swelling in and out
+    const len = dur * spb, fl = ctx.createBiquadFilter(), g = ctx.createGain(); fl.type = 'lowpass'; fl.frequency.value = 1500; fl.Q.value = 0.3;
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(v, at + 0.35); g.gain.setValueAtTime(v, at + len); g.gain.linearRampToValueAtTime(0.0001, at + len + 0.5);
+    for (const det of [-9, 9]) { const o = osc('sawtooth', f, det); o.connect(fl); o.start(at); o.stop(at + len + 0.55); } fl.connect(g); g.connect(to.pad);
+  } else if (kind === 'bass') {                                                                          // a plucked bass: bright for a moment, then round
+    const o = osc('sawtooth', f), s2 = osc('sine', f), fl = ctx.createBiquadFilter(), g = hit(v, 0.008, 0.6); fl.type = 'lowpass'; fl.frequency.setValueAtTime(1100, at); fl.frequency.exponentialRampToValueAtTime(260, at + 0.3);
+    o.connect(fl); fl.connect(g); s2.connect(g); g.connect(to.rhy); o.start(at); s2.start(at); o.stop(at + 0.7); s2.stop(at + 0.7);
+  } else if (kind === 'pluck') { const o = osc('triangle', f), g = hit(v, 0.004, 0.4); o.connect(g); pan(g, to.rhy, beat * 2 % 2 ? 0.45 : -0.45); o.start(at); o.stop(at + 0.5);
+  } else { let buf = AU.hiss.get(ctx); if (!buf) { buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.25), ctx.sampleRate); const d = buf.getChannelData(0), r = rng(4); for (let i = 0; i < d.length; i++) d[i] = 2 * r() - 1; AU.hiss.set(ctx, buf); }   // sleigh bells: bright hiss, shaken twice
+    const n = ctx.createBufferSource(), g = ctx.createGain(); n.buffer = buf; for (const [fq, q] of [[5200, 3], [8400, 4]]) { const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = fq; fl.Q.value = q; n.connect(fl); fl.connect(g); }
+    g.gain.setValueAtTime(v, at); g.gain.exponentialRampToValueAtTime(v * 0.25, at + 0.03); g.gain.setValueAtTime(v * 0.8, at + 0.035); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.16); pan(g, to.rhy, 0.2); n.start(at); n.stop(at + 0.2); }
+}
+function auStep(ctx, to, T, i, at) { const g = T.grid.get(i % (T.len * 4)); if (g) for (const e of g) if (!(e[5] > i / 4)) auPlay(ctx, to, e, at, 60 / T.bpm); }   // everything due on one quarter-beat
 function auWake() { if (!S.song) return false; const C = window.AudioContext || window.webkitAudioContext; if (!C) return false;        // browsers only allow sound after a tap
   if (!AU.ctx) { AU.ctx = new C(); AU.bus = auBus(AU.ctx); AU.bus.out.connect(AU.ctx.destination); }
   if (AU.ctx.state !== 'running') AU.ctx.resume(); return true; }
-function auFresh(t) { const T = TUNES[S.song]; if (AU.gen) { const old = AU.gen; old.gain.setTargetAtTime(0, AU.ctx.currentTime, 0.02); setTimeout(() => old.disconnect(), 300); }   // the picture restarted: drop what was queued and start the tune again in step
-  AU.gen = AU.ctx.createGain(); AU.gen.connect(AU.bus.in); AU.next = T ? Math.max(0, Math.ceil(t * T.bpm / 60 * 4)) : 0; }
-function auTick(t) {                         // called every frame: queue the sounds due in the next third of a second
+function auKill() { const old = AU.gen; AU.gen = null; if (!old) return; for (const k in old) old[k].gain.setTargetAtTime(0, AU.ctx.currentTime, 0.03); setTimeout(() => { for (const k in old) old[k].disconnect(); }, 500); }   // drop whatever was queued; the echo rings on
+function auFresh(t) { const T = TUNES[S.song]; auKill(); AU.gen = {}; for (const k of ['lead', 'pad', 'rhy']) { AU.gen[k] = AU.ctx.createGain(); AU.gen[k].connect(AU.bus[k]); }       // the picture restarted: start the tune again in step with it
+  AU.base = AU.ctx.currentTime - t; AU.off = 0; AU.dirty = false; AU.next = T ? Math.max(0, Math.ceil((t + 0.02) * T.bpm / 60 * 4)) : 0; }
+function auTick(t) {                         // called every frame: queue the notes due in the next half second, each at its exact time on the sound clock, so a slow frame never makes the rhythm stumble
   const T = TUNES[S.song]; if (!T || !AU.ctx || AU.ctx.state !== 'running') { AU.last = t; return; }
-  if (!AU.gen || t < AU.last - 0.05 || t > AU.last + 1) auFresh(t); AU.last = t;
-  const spq = 60 / T.bpm / 4, until = (t + 0.3) / spq, L = T.len * 4;
-  for (; AU.next < until; AU.next++) { const g = T.grid.get(AU.next % L); if (g) for (const e of g) auPlay(AU.ctx, AU.gen, e, AU.ctx.currentTime + Math.max(0, AU.next * spq - t)); }
+  const now = AU.ctx.currentTime; AU.off = Math.abs(now - t - AU.base) > 0.12 ? AU.off + 1 : 0;        // the two clocks have slipped apart for several frames running: line them up again
+  if (!AU.gen || AU.dirty || t < AU.last - 0.05 || t > AU.last + 1 || AU.off > 4) auFresh(t); AU.last = t;
+  const spq = 60 / T.bpm / 4, until = (t + 0.5) / spq;
+  for (; AU.next < until; AU.next++) auStep(AU.ctx, AU.gen, T, AU.next, Math.max(now + 0.005, AU.base + 0.03 + AU.next * spq));
 }
 async function renderSound(key, secs) {      // the same tune as a sound file, for making a video frame by frame
   const T = TUNES[key], ctx = new OfflineAudioContext(2, Math.ceil(secs * 44100), 44100), bus = auBus(ctx); bus.out.connect(ctx.destination);
-  const spq = 60 / T.bpm / 4, L = T.len * 4; for (let i = 0; i * spq < secs; i++) { const g = T.grid.get(i % L); if (g) for (const e of g) auPlay(ctx, bus.in, e, i * spq); }
+  const spq = 60 / T.bpm / 4; for (let i = 0; i * spq < secs; i++) auStep(ctx, bus, T, i, 0.03 + i * spq);
   const buf = await ctx.startRendering(), n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)), ch = [buf.getChannelData(0), buf.getChannelData(1)], w = (o, str) => { for (let i = 0; i < str.length; i++) out.setUint8(o + i, str.charCodeAt(i)); };
   w(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); w(8, 'WAVEfmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, 44100, true); out.setUint32(28, 176400, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, n * 4, true);
   for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 32767, true);
@@ -1235,7 +1266,7 @@ async function renderSound(key, secs) {      // the same tune as a sound file, f
 }
 function setSong(key) {                      // '' is silence
   S.song = TUNES[key] ? key : ''; mark('tunes', S.song || 'off');
-  if (S.song) { if (S.music) setMusic('', false); setVal('bpm', String(TUNES[S.song].bpm)); auWake(); S.t0 = performance.now(); }
+  if (S.song) { if (S.music) setMusic('', false); setVal('bpm', String(TUNES[S.song].bpm)); auWake(); AU.dirty = true; S.t0 = performance.now(); } else auKill();
   showSoundButton();
 }
 function showSoundButton() { const need = !!S.song && S.viewer && !(AU.ctx && AU.ctx.state === 'running'); $('soundOn').hidden = !need; $('musicBox').hidden = !(need || S.music); }
@@ -1274,7 +1305,7 @@ function spLoad(id, play) { SP.id = id; SP.want = !!(id && play); SP.on = false;
 function setMusic(key, play) {               // key: '' (off), a name from SONGS, or a Spotify song link or id
   const song = SONGS[key], id = song ? song.id : spId(key); S.music = id ? (song ? key : id) : '';
   for (const b of $('songs').children) b.classList.toggle('on', b.dataset.k === (S.music ? (song ? key : 'own') : ($('spRow').hidden ? 'off' : 'own')));
-  if (id && S.song) { S.song = ''; mark('tunes', 'off'); if (AU.gen) auFresh(0); }      // a pop song replaces the built-in tune
+  if (id && S.song) { S.song = ''; mark('tunes', 'off'); auKill(); }      // a pop song replaces the built-in tune
   spLoad(id, play); showSoundButton();
   if (song) setVal('bpm', String(song.bpm));                               // lights pulse at the song's tempo
 }
@@ -1310,23 +1341,24 @@ function plusThumb(c) { const g = c.getContext('2d'), w = c.width, h = c.height;
   g.setLineDash([]); g.lineWidth = 4; g.beginPath(); g.moveTo(w / 2, h * .36); g.lineTo(w / 2, h * .64); g.moveTo(w / 2 - h * .14, h / 2); g.lineTo(w / 2 + h * .14, h / 2); g.stroke(); }
 function useText(str, live) {
   str = ((str || '').trim().slice(0, 14) || 'NOEL').toUpperCase();
-  try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; S.preset = 'text'; S.kind = ''; if (first) $('scene').value = 'spin'; markChips();
+  try { const raw = makeText(str, 120000, rng(3)), first = S.preset !== 'text'; fineCells(false); S.preset = 'text'; S.kind = ''; if (first) $('scene').value = 'spin'; markChips();
     setModel(raw, str.toLowerCase(), first ? { topper: false, repaint: true, paint: '#d41a1f', mode: 'outline', bulbs: 150 } : null); buildCaption();
     if (live) S.t0 = performance.now() - 4000; }                           // while typing, skip the build-up so the letters show straight away
   catch (e) { setStatus(e.message || String(e), true); }
 }
 const RAW = {};
+const fineCells = on => { if (on && S.cellWas == null) { S.cellWas = $('cell').value; if (+S.cellWas > 5) setVal('cell', '5'); } else if (!on && S.cellWas != null) { setVal('cell', S.cellWas); S.cellWas = null; } };   // a photo needs the smallest characters to show a face; put the size back afterwards
 const goTall = () => { if ($('format').value === '1920x1080') setVal('format', '1080x1920'); };      // a photo and the globe are upright things: they start in the tall shape, which they fill
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
-  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
+  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; fineCells(false); S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
   if (p.word && was !== p) goTall();
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
 async function loadPhoto(file) {
   try { setStatus('Reading your photo ...'); const url = URL.createObjectURL(file), im = new Image();
     await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('That picture could not be opened. Try a .jpg or .png.')); im.src = url; });
-    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(); } markChips();
+    const raw = makePhoto(im, 120000, rng(3)), first = S.kind !== 'photo'; URL.revokeObjectURL(url); S.preset = ''; S.kind = 'photo'; if (first) { $('scene').value = 'spin'; goTall(); fineCells(true); } markChips();
     setModel(raw, 'my photo', first ? { topper: false, repaint: false, mode: 'outline', bulbs: 130 } : null); buildCaption(); track('photo_used', {});
   } catch (e) { setStatus(e.message || String(e), true); }
 }
@@ -1340,7 +1372,7 @@ async function loadFiles(files) {
     const mesh = glb ? await parseGLB(await glb.arrayBuffer()) : obj ? parseOBJ(await obj.text(), mtl ? await mtl.text() : null) : parseSTL(await stl.arrayBuffer());
     if (mesh.T.length < 9) throw new Error('No triangles found in that file.');
     const c = outerShell(sampleTriangles(mesh, 300000, rng(7)), 130000, rng(8));
-    S.preset = ''; S.kind = 'file'; markChips();
+    fineCells(false); S.preset = ''; S.kind = 'file'; markChips();
     const segs = findCreases(mesh.T, c, rng(9));
     setModel({ P: c.P, N: c.N, n: c.n, tint: c.tint, paint: pickPaintable(c), segs, zUp: !!stl }, main.name, { topper: false, repaint: false, mode: segs ? 'outline' : 'spiral' }); buildCaption();   // STL files are usually Z-up
     track('model_upload', { type: main.name.split('.').pop().toLowerCase() });
@@ -1405,9 +1437,9 @@ const chip = (box, k, label, fn) => { const b = document.createElement('button')
 const THUMBS = [];                            // tile pictures are drawn a moment after the page appears, so the first frame is never held up
 const tile = (k, label, fn, draw) => { const b = document.createElement('button'), c = document.createElement('canvas'); c.width = 168; c.height = 112; b.className = 'tile'; b.dataset.k = k; b.onclick = fn;
   b.append(c, label); $('gallery').appendChild(b); THUMBS.push(() => draw(c)); return c; };
-tile('text', 'A word', () => { usePreset('text'); $('word').focus(); }, c => presetThumb(c, { make: (n, r) => makeText('ABC', n, r), repaint: true, paint: '#d41a1f' }, -0.3));      // the ones you make your own come first
+tile('text', 'A word', () => { usePreset('text'); $('word').focus(); }, c => presetThumb(c, { make: (n, r) => makeText('ABC', n, r), repaint: true, paint: '#d41a1f' }, -0.3));
+for (const k of ['train', 'globe', 'coupe', 'sedan', 'hatch', 'suv', 'pickup', 'jet', 'sleigh', 'tree', 'rocket', 'snowman', 'gift']) { const p = PRESETS[k]; tile(k, p.label, () => usePreset(k), c => presetThumb(c, p)); }
 const photoTile = tile('photo', 'Your photo', () => $('photo').click(), photoThumb);
-for (const [k, p] of Object.entries(PRESETS)) tile(k, p.label, () => usePreset(k), c => presetThumb(c, p));
 const fileTile = tile('file', 'Your 3D file', () => $('file').click(), plusThumb);
 const SWATCHES = { Red: '#d41a1f', Green: '#0f7a3d', Blue: '#2a62d8', Yellow: '#f2c21a', Orange: '#ff7a1a', Pink: '#ff5fa2', White: '#f2f2f6', Silver: '#c2c8d2', Black: '#14161c' };
 for (const [name, h] of Object.entries(SWATCHES).reverse()) { const b = document.createElement('button'); b.className = 'sw'; b.dataset.k = h; b.style.background = h; b.title = name; b.setAttribute('aria-label', name);
