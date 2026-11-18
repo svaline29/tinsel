@@ -14,7 +14,7 @@ It runs entirely in the browser: one HTML file, no build step, no server, nothin
 - Three scenes: driving through snow (ground, snowfall and pines slide past, wheels turn), flying through snow, or spinning on ice with a reflection
 - A build-up intro, a caption, and the page's own source code scrolling underneath
 - Lights that pulse to a tempo you choose, so the video lands on the beat of whatever song you add when you post it
-- Sound in the video: three old carols (Jingle Bells, Deck the Halls, Carol of the Bells) played by the page itself and recorded into the download, with the lights in time
+- Sound in the video: three old carols (Jingle Bells, Deck the Halls, Carol of the Bells) and Tchaikovsky's Dance of the Sugar Plum Fairy played by the page itself and recorded into the download, with the lights in time
 - Or time the lights to a pop song and preview it through Spotify's own small player; nothing is copied onto the site, that video stays silent, and you add the song in Instagram or TikTok when you post
 - On a phone, one button opens the share sheet to save the video or post it
 - Download an MP4 (vertical, square or wide), or send a link that replays exactly what you made

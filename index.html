@@ -298,7 +298,7 @@
       <b>What is counted.</b> The host, Vercel, counts page visits without cookies. A simple counter adds one each time a video or a link is made. Neither records who you are, and this site itself sets no cookies.<br><br>
       <b>Spotify.</b> If you choose to preview a pop song, Spotify's own player loads from Spotify, and Spotify's privacy policy applies to it.<br><br>
       <b>Using the site.</b> Videos you make are yours to post. Only use photos you have the right to use. The site is provided as it is, with no guarantee.<br><br>
-      The built-in tunes are traditional carols played by this page's own code. This site is not connected with Spotify, Instagram, TikTok or any car maker.<br><br>
+      The built-in tunes are traditional carols and Tchaikovsky's Sugar Plum Fairy (1892), played by this page's own code. This site is not connected with Spotify, Instagram, TikTok or any car maker.<br><br>
       <span id="counts"></span>
       <a href="https://github.com/svaline29/tinsel" target="_blank" rel="noopener">Source code and contact</a>
     </details>
@@ -892,7 +892,7 @@ const PRESETS = {
   hatch:   car('Hatchback', HATCH, '#f2c21a'),
   suv:     car('SUV', CROSSOVER, '#2a62d8'),
   pickup:  car('Pickup', PICKUP, '#e8ecf2'),
-  nutcracker: { label: 'Nutcracker', make: (n, r) => makeNutcracker(n, r), topper: false, repaint: true, paint: '#c8102e', mode: 'outline', bulbs: 270, tall: true },
+  nutcracker: { label: 'Nutcracker', make: (n, r) => makeNutcracker(n, r), topper: false, repaint: true, paint: '#c8102e', mode: 'outline', bulbs: 270, tall: true, song: 'sugar' },
   house:   { label: 'House', make: (n, r) => makeHouse(n, r), topper: false, repaint: true, paint: '#35557f', mode: 'outline', bulbs: 300, tall: true },
   train:   { label: 'Steam train', make: (n, r) => makeTrain(n, r), topper: false, repaint: true, paint: '#0f7a3d', mode: 'outline', car: true, bulbs: 320 },
   jet:     { label: 'Jet',     make: (n, r) => makeJet(n, r),     topper: false, repaint: true,  paint: '#8d99ae', mode: 'outline', scene: 'fly', acro: true, bulbs: 340 },
@@ -977,7 +977,7 @@ function buildLights(d, o) {
 }
 
 // ================================================================ STATE
-const S = { spinV: 0, lastA: 0, song: '', music: '', kind: '', cellWas: null, fmtWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
+const S = { spinV: 0, lastA: 0, songPicked: false, song: '', music: '', kind: '', cellWas: null, fmtWas: null, raw: null, dense: null, name: '', preset: null, zUp: false, quarter: 0, body: null, lights: null, t0: performance.now(), drag: 0, cap: 1e9, viewer: false };
 const XMAS = (() => { const n = new Date(), y = n.getFullYear(), d = new Date(y, 11, 25); if (n > new Date(y, 11, 26)) d.setFullYear(y + 1); return Math.max(0, Math.ceil((d - n) / 864e5)); })();
 let W = 0, H = 0, CW = 6, CH = 12, CW2 = 4, CH2 = 8, PW = 1080, PH = 1920, OX = 0, OY = 0;     // CW2 x CH2: the smaller characters the caption is built from
 let tileOn = 0, soft = 0, tint, depth, chr, col, emit, halo, img, px32, atlas, atlas2, ramp, capBmp = null, stamp = null, panelBase = 1e9, CODE = null;
@@ -1097,7 +1097,7 @@ function frame(t) {
   const rollA = fly && $('acro').checked && rb >= 0 && rph < 3 ? TAU * rq * rq * (3 - 2 * rq) : 0;                                         // a full roll every eight beats, the first one as the caption lands
   const M = turn(yaw, fly ? 0.75 + 0.18 * Math.sin(0.8 * t) + 0.05 * Math.sin(1.9 * t) + rollA : 0, fly ? (tall ? 0.6 : 0.3) + 0.06 * Math.sin(0.6 * t + 1) : 0, d.fwdAngle);   // flying: it climbs across the picture with its top turned towards you
   const fwx = Math.cos(d.fwdAngle), fwz = Math.sin(d.fwdAngle), nX = M[0] * fwx + M[2] * fwz, nY = M[3] * fwx + M[5] * fwz, nZ = M[6] * fwx + M[8] * fwz;   // which way the nose points
-  const bpm = +$('bpm').value, pe = S.song && TUNES[S.song].meter === 3 ? 3 : 1, bph = t / (u * pe), bd = Math.abs(bph - Math.round(bph)) * pe, beat = bpm ? 0.92 + 0.6 * Math.exp(-18 * bd * bd) : 1;   // lights stay lit and flash brighter on the beat (in waltz time, once a bar); the first beat is at time zero
+  const bpm = +$('bpm').value, pe = S.song ? TUNES[S.song].pulse || 1 : 1, bph = t / (u * pe), bd = Math.abs(bph - Math.round(bph)) * pe, beat = bpm ? 0.92 + 0.6 * Math.exp(-18 * bd * bd) : 1;   // lights stay lit and flash brighter on the beat (for some tunes every second or third beat); the first beat is at time zero
   const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
   depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0); tileOn = 0;
 
@@ -1321,11 +1321,17 @@ const TUNES = {
     melody: JING + 'E4:1 D4:1 D4:1 E4:1 D4:2 G4:2 ' + JING + 'G4:1 G4:1 F4:1 D4:1 C4:4' },
   deck: { label: 'Deck the Halls', bpm: 132, meter: 4, chords: 'C C G C C C G C G C G G C C F C',
     melody: DECK + DECK + 'D4:1.5 E4:.5 F4:1 D4:1 E4:1.5 F4:.5 G4:1 D4:1 E4:.5 F#4:.5 G4:1 A4:.5 B4:.5 C5:1 B4:1 A4:1 G4:2 G4:1.5 F4:.5 E4:1 D4:1 C4:1 D4:1 E4:1 C4:1 A4:.5 A4:.5 A4:.5 A4:.5 G4:1.5 F4:.5 E4:1 D4:1 C4:2' },
-  bells: { label: 'Carol of the Bells', bpm: 180, meter: 3 },
+  bells: { label: 'Carol of the Bells', bpm: 180, meter: 3, pulse: 3 },
+  sugar: { label: 'Sugar Plum Fairy', bpm: 140, meter: 4, pulse: 2,       // Tchaikovsky, The Nutcracker (1892), the celesta tune, bars 5 to 12. One beat here is an eighth note; chords are joined with +
+    right: '-:1 B5+G6:.5 G5+E6:.5 B5+G6:1 A5+F#6:1  F#5+D#6:1 G5+E6:1 F5+G#5+D6:.5 F5+G#5+D6:.5 F5+G#5+D6:1  E5+G5+A#5+C#6:.5 E5+G5+A#5+C#6:.5 E5+G5+A#5+C#6:1 D#5+F#5+A5+C6:.5 D#5+F#5+A5+C6:.5 D#5+F#5+A5+C6:1  G5+B5:.5 E6:.5 A5+C6:.5 E6:.5 G5+B5:1 -:1  -:1 C5+G5:.5 G4+E5:.5 C5+G5:1 C5+F#5:1  D#5+F#5+C6:1 E5+G5+B5:1 A#5+C#6+E6+G6:.5 A#5+C#6+E6+G6:.5 A#5+C#6+E6+G6:1  G#5+B5+D6+F#6:.5 G#5+B5+D6+F#6:.5 G#5+B5+D6+F#6:1 F#5+A#5+C#6+E6:.5 F#5+A#5+C#6+E6:.5 F#5+A#5+C#6+E6:1  B5+D#6:.5 F#6:.5 A5+E6:.5 F#6:.5 B5+D#6:1 -:1',
+    left: 'E2+E3:1 G3+B3:1 E3:1 A3+C4:1  E3:1 A#3+C#4:1 E3:1 B3+D4:1  E3:1 C#4+E4:1 E3:1 D#4+F#4:1  E4+G4:1 E4+F#4+A4:1 E4+G4:1 E3:.25 D3:.25 C3:.25 B2:.25  A#2:1 E3+G3+C4:1 A2:1 D#3+F#3+C4:1  G2:1 E3+G3+B3:1 F#2:1 F#3+A#3:1  F#3:1 G#3+B3:1 F#3:1 A#3+C#4:1  B2+F#3+B3:1 C3+F#3+A#3:1 B2+F#3+B3:1 B2:.25 A2:.25 G2:.25 F#2:.25' },
 };
 for (const T of Object.values(TUNES)) {                                    // turn each tune into a list of sounds: [beat, instrument, pitch, loudness, length in beats, only from this beat on]
   const ev = []; let b = 0;
-  if (T.melody) {
+  if (T.right) { const chords = str => str.trim().split(/\s+/).map(q => { const [p, d] = q.split(':'); return [p === '-' ? [] : p.split('+').map(hz).sort((x, y) => x - y), +d]; });
+    for (const [fs, d] of chords(T.right)) { fs.forEach((f, i) => ev.push([b, 'lead', f, i === fs.length - 1 ? 0.44 : 0.1])); b += d; }       // the celesta: the top note of each chord carries the tune, the rest sit quietly under it
+    let c = 0; for (const [fs, d] of chords(T.left)) { for (const f of fs) ev.push(d < 1 ? [c, 'bass', f, 0.24] : c % 2 === 0 && f < 300 ? [c, 'bass', f, 0.3 / Math.sqrt(fs.length)] : [c, 'pluck', f, 0.085]); c += d; }   // plucked strings: a bass note on the beat, a chord after it, and the little run down at the end of a phrase
+  } else if (T.melody) {
     for (const [p, d] of notes(T.melody)) { if (p !== '-') ev.push([b, 'lead', hz(p) * 2, b % 2 ? 0.42 : 0.5], [b, 'lead', hz(p) * 4, 0.09, 0, 12]); b += d; }   // the tune on a celesta, with a glockenspiel an octave up once the caption has landed
     T.chords.split(' ').forEach((c, bar) => { const q = CHORD[c], t = bar * 4;
       for (let i = 1; i < 4; i++) ev.push([t, 'pad', hz(q[i]), 0.035, 4]);                               // soft strings holding the chord
@@ -1504,7 +1510,8 @@ const fineCells = on => { if (on && S.cellWas == null) { S.cellWas = $('cell').v
 const goTall = on => { if (on) { if ($('format').value === '1920x1080') { S.fmtWas = '1920x1080'; setVal('format', '1080x1920'); } } else if (S.fmtWas) { if ($('format').value === '1080x1920') setVal('format', S.fmtWas); S.fmtWas = null; } };   // a photo and the globe are upright things: they start in the tall shape, which they fill, and the wide shape comes back afterwards
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
-  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; fineCells(false); S.preset = key; S.kind = ''; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
+  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; fineCells(false); S.preset = key; S.kind = '';
+  if (S.song && !S.songPicked && S.song !== (p.song || 'jingle')) setSong(p.song || 'jingle');      // the nutcracker comes with its own music, until somebody picks a tune themselves if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
   if (p.word || p.tall) { if (was !== p) goTall(true); } else goTall(false);
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
@@ -1603,8 +1610,8 @@ for (const o of $('format').options) { chip('sizes', o.value, '', () => setVal('
 for (const [k, L] of Object.entries(LOOKS)) { chip('looks', k, L.label, () => useLook(k)); const d = document.createElement('span'); d.className = 'dots';
   for (const q of PALETTES[L.palette].slice(0, 3)) { const e = document.createElement('b'); e.style.background = 'rgb(' + q.map(v => Math.round(v * 255)).join(',') + ')'; d.appendChild(e); } $('looks').lastChild.prepend(d); }
 for (const id of ['palette', 'ramp']) $(id).addEventListener('input', markChips);
-chip('tunes', 'off', 'Off', () => { setSong(''); if (!S.music) setVal('bpm', '0'); });
-for (const [k, T] of Object.entries(TUNES)) chip('tunes', k, T.label, () => setSong(k));
+chip('tunes', 'off', 'Off', () => { S.songPicked = true; setSong(''); if (!S.music) setVal('bpm', '0'); });
+for (const [k, T] of Object.entries(TUNES)) chip('tunes', k, T.label, () => { S.songPicked = true; setSong(k); });
 $('soundOn').onclick = () => { auWake(); S.t0 = performance.now(); showSoundButton(); setTimeout(showSoundButton, 400); };
 addEventListener('pointerdown', () => { if (S.song && !S.viewer && !(AU.ctx && AU.ctx.state === 'running')) auWake(); });     // the first tap anywhere lets the tune start
 chip('songs', 'off', 'None', () => { $('spRow').hidden = true; setMusic('', false); if (!S.song) setVal('bpm', '0'); });
@@ -1714,7 +1721,7 @@ usePreset(PRESETS[start.get('m')] || start.get('m') === 'text' ? start.get('m') 
 for (const id of SHARE_IDS) if (start.has(id) && !['word', 'from', 'caption'].includes(id)) setVal(id, start.get(id));
 markChips();
 setMusic(start.get('music') || '', false);
-S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? start.get('song') : 'jingle');
+S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? start.get('song') : 'jingle'); S.songPicked = start.has('song') || !!S.music;
 if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 tally('visit');
