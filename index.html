@@ -806,7 +806,7 @@ function frame(t) {
         ca = Math.cos(yaw), sa = Math.sin(yaw);
   const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : 0;
   const two = $('twoSided').checked, mirror = $('mirror').checked && !drive, intro = $('intro').checked;
-  const u = beatUnit(), bpm = +$('bpm').value, beat = bpm ? 0.7 + 0.5 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights flash on every beat
+  const u = beatUnit(), bpm = +$('bpm').value, beat = bpm ? 0.92 + 0.6 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights stay lit and flash brighter on every beat (the first beat is at time zero)
   const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
   depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0);
 
