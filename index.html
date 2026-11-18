@@ -156,7 +156,7 @@
   body.m2 #cv { border:0; border-radius:0; }
   #rail { position:absolute; right:4px; top:6px; bottom:6px; z-index:3; display:flex; flex-direction:column; justify-content:center; gap:3px; pointer-events:none; }
   #rail button { pointer-events:auto; flex:0 1 54px; min-height:36px; width:54px; padding:0; border:0; border-radius:0; background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; color:#fff; font-size:9.5px; line-height:1.1; text-shadow:0 1px 3px #000, 0 0 8px #000; }
-  #rail i { display:flex; align-items:center; justify-content:center; height:70%; max-height:40px; aspect-ratio:1; border-radius:50%; background:rgba(12,15,30,.74); border:1px solid var(--edge); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); transition:border-color .12s, color .12s, background .12s; }
+  #rail i { display:flex; align-items:center; justify-content:center; height:70%; max-height:40px; min-width:28px; aspect-ratio:1; border-radius:50%; background:rgba(12,15,30,.74); border:1px solid var(--edge); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); transition:border-color .12s, color .12s, background .12s; }
   #rail svg { width:56%; height:56%; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
   #rail button.on { color:var(--hot); } #rail button.on i { border-color:var(--hot); background:rgba(40,32,8,.85); }
   #railTip { position:absolute; right:62px; top:50%; transform:translateY(-50%); z-index:3; padding:6px 10px; border-radius:999px; background:rgba(12,15,30,.85); border:1px solid var(--hot); color:var(--hot); font-size:12px; pointer-events:none; animation:fade 7s forwards; }
@@ -1639,7 +1639,8 @@ function mobileUI() {
   if (window.ResizeObserver) { const ro = new ResizeObserver(fit); ro.observe(sheet); ro.observe($('actions')); } addEventListener('resize', fit); fit();
   if (window.visualViewport) { const vv = visualViewport, up = () => { sheet.style.bottom = Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'; }; vv.addEventListener('resize', up); vv.addEventListener('scroll', up); }   // keep the sheet above the keyboard
 }
-const M2 = new URLSearchParams(location.search).has('m2');      // switched on by adding ?m2 to the address, until it becomes the way phones see the site
+const M2 = (() => { const q = new URLSearchParams(location.search); if (q.has('old')) return false; if (q.has('m2')) return true;      // phones get this layout; ?old on the address brings back the earlier one, ?m2 forces this one anywhere
+  return /iPhone|iPod|Android.+Mobile|Windows Phone/i.test(navigator.userAgent) || (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600); })();
 
 // ================================================================ START
 // A phone starts with the tall phone shape; anything else starts wide. A link carries a size only if its maker changed it, so each viewer gets the shape that fits their screen.
@@ -1658,7 +1659,7 @@ S.viewer = start.get('v') === '1'; setSong(S.music ? '' : start.has('song') ? st
 if (start.get('v') === '1') { document.body.classList.add('viewer'); S.viewer = true;
   $('ctaText').textContent = ($('from').value.trim() || 'Someone') + ' made this for you.'; track('card_view', { shape: S.preset }); }
 tally('visit');
-if (M2 && !S.viewer) try { mobileUI(); } catch (e) { document.body.classList.remove('m2', 'm2open'); }
+if (M2 && !S.viewer) try { mobileUI(); } catch (e) { document.body.classList.remove('m2', 'm2open'); tally('error'); }
 $('about').addEventListener('toggle', e => { if (e.target.open && !$('counts').textContent) showCounts(); });
 if (start.has('stats')) showStats();
 addEventListener('hashchange', () => { if (location.hash === '#stats') showStats(); });       // typed onto the address of a page that is already open
