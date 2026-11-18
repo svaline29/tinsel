@@ -191,7 +191,7 @@
 
     <h2>Scene</h2>
     <div class="seg" id="scenes"></div>
-    <select id="scene" hidden><option value="drive" selected>Driving through snow</option><option value="spin">Spinning on ice</option></select>
+    <select id="scene" hidden><option value="drive" selected>Driving through snow</option><option value="fly">Flying through snow</option><option value="spin">Spinning on ice</option></select>
 
     <h2>Style</h2>
     <div class="btns" id="looks"></div>
@@ -610,6 +610,85 @@ function makeText(str, n, r) {               // any word, as fat 3D letters (lon
     if (dx) B.segs.push(X, (Hc - py) * TALL, D / 2, X, (Hc - py - 1) * TALL, D / 2, dx * .4, 0, 1); else B.segs.push(px, (Hc - Y) * TALL, D / 2, px + 1, (Hc - Y) * TALL, D / 2, 0, -dy * .4, 1); }
   return finish(B, r, { sway: true });
 }
+// ---- parts for building things out of simple pieces
+function skin(B, st, smooth, n, r, caps, colour) {            // a lofted body; colour(x, y, z, L) returns [colour, paintable] or nothing to leave a hole
+  const L = loft(st, smooth); loftEach(L, n, r, caps, (x, y, z, nx, ny, nz) => { const c = colour(x, y, z, L); if (c) put(B, x, y, z, nx, ny, nz, c[0], c[1]); }); return L; }
+function wing(B, n, r, a, b, ca, cb, th, col, paint) {        // a thin tapered surface from root a to tip b (points on the front edge); it runs back along -x by ca at the root and cb at the tip
+  const sx = b[0] - a[0], sy = b[1] - a[1], sz = b[2] - a[2], sl = Math.hypot(sy, sz) || 1, ty = -sz / sl, tz = sy / sl, big = Math.max(ca, cb);
+  for (let k = 0; k < n;) { const s = r(), ch = ca + (cb - ca) * s; if (r() * big > ch) continue; k++;
+    const c = r(), side = r() < .5 ? 1 : -1, h = th * ch * 2.6 * Math.sqrt(c) * (1 - c) * side;
+    put(B, a[0] + sx * s - c * ch, a[1] + sy * s + ty * h, a[2] + sz * s + tz * h, c < .12 ? .7 : -.08, ty * side, tz * side, col, paint); }
+  B.segs.push(a[0], a[1], a[2], b[0], b[1], b[2], 1, 0, 0, b[0], b[1], b[2], b[0] - cb, b[1], b[2], 0, sy / sl, sz / sl, a[0] - ca, a[1], a[2], b[0] - cb, b[1], b[2], -1, 0, 0);   // lights along the front, the tip and the back
+}
+function rod(B, n, r, a, b, rad, col, paint) {                // a round bar from a to b
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.hypot(d[0], d[1], d[2]) || 1, w = d.map(v => v / l), u = Math.abs(w[1]) < .9 ? [0, 1, 0] : [1, 0, 0];
+  let e1 = [w[1] * u[2] - w[2] * u[1], w[2] * u[0] - w[0] * u[2], w[0] * u[1] - w[1] * u[0]]; const m = Math.hypot(e1[0], e1[1], e1[2]); e1 = e1.map(v => v / m);
+  const e2 = [w[1] * e1[2] - w[2] * e1[1], w[2] * e1[0] - w[0] * e1[2], w[0] * e1[1] - w[1] * e1[0]];
+  for (let k = 0; k < n; k++) { const f = r(), t = r() * TAU, c = Math.cos(t), q = Math.sin(t), nx = e1[0] * c + e2[0] * q, ny = e1[1] * c + e2[1] * q, nz = e1[2] * c + e2[2] * q;
+    put(B, a[0] + d[0] * f + nx * rad, a[1] + d[1] * f + ny * rad, a[2] + d[2] * f + nz * rad, nx, ny, nz, col, paint); } }
+function wheelAt(B, n, r, cx, cz, wr, wd, id, tyre, rim, hub) { // a wheel standing on the ground; id lets it roll when the model drives
+  for (let k = 0; k < n / 2; k++) { const a = r() * TAU; put(B, cx + wr * Math.cos(a), wr + wr * Math.sin(a), cz + (r() - .5) * wd, Math.cos(a), Math.sin(a), 0, tyre, 0, id); }
+  for (const s of [-1, 1]) for (let k = 0; k < n / 4; k++) { const a = r() * TAU, rr = wr * Math.sqrt(r()), spoke = Math.abs(((a * 5 / TAU) % 1) - .5) < .16 || rr < .28 * wr;
+    put(B, cx + rr * Math.cos(a), wr + rr * Math.sin(a), cz + s * wd / 2, 0, 0, s, rr > .78 * wr ? tyre : spoke ? rim : hub, 0, id); } }
+function segLine(B, L, deg, x0, x1, m) {      // a string of lights along a lofted body, at one angle around it
+  let prev = null; for (let i = 0; i <= m; i++) { const x = x0 + (x1 - x0) * i / m, q = [0, 0, 0]; L.at(x, deg * Math.PI / 180, q); const my = L.mid(x), l = Math.hypot(q[1] - my, q[2]) || 1;
+    if (prev) B.segs.push(prev[0], prev[1], prev[2], q[0], q[1], q[2], 0, (q[1] - my) / l, q[2] / l); prev = q; } }
+function segPath(B, pts, nx, ny, nz) { for (let i = 1; i < pts.length; i++) B.segs.push(pts[i - 1][0], pts[i - 1][1], pts[i - 1][2], pts[i][0], pts[i][1], pts[i][2], nx, ny, nz); }
+function segBox(B, cx, cy, cz, sx, sy, sz) {  // lights along the top edges and the upright corners of a box
+  const x0 = cx - sx / 2, x1 = cx + sx / 2, y0 = cy - sy / 2, y1 = cy + sy / 2, z0 = cz - sz / 2, z1 = cz + sz / 2;
+  segPath(B, [[x0, y1, z1], [x1, y1, z1]], 0, 1, 1); segPath(B, [[x0, y1, z0], [x1, y1, z0]], 0, 1, -1); segPath(B, [[x0, y1, z0], [x0, y1, z1]], -1, 1, 0); segPath(B, [[x1, y1, z0], [x1, y1, z1]], 1, 1, 0);
+  for (const x of [x0, x1]) for (const z of [z0, z1]) segPath(B, [[x, y0, z], [x, y1, z]], Math.sign(x - cx), 0, Math.sign(z - cz)); }
+
+function makeJet(n, r) { const B = builder(), SKIN = [.6, .65, .72], GLASS = [.13, .2, .33], DARK = [.16, .17, .2];
+  const body = skin(B, [[-2.4, .30, .40, .68, 3], [-2.2, .38, .34, .72, 3], [-1.2, .44, .30, .78, 3], [-.2, .42, .28, .80, 2.8], [.7, .34, .30, .78, 2.4], [1.5, .24, .36, .70, 2.1], [2.1, .13, .44, .62, 2], [2.6, .02, .52, .55, 2]],
+    5, Math.floor(n * .40), r, true, x => [x < -2.25 ? DARK : SKIN, x >= -2.25]);
+  skin(B, [[.45, .05, .76, .80, 2], [.75, .17, .74, .98, 2], [1.15, .19, .72, 1.02, 2], [1.55, .14, .68, .86, 2], [1.8, .04, .62, .68, 2]], 3, Math.floor(n * .05), r, false, (x, y) => y > body.top(x) - .02 ? [GLASS, 0] : null);
+  for (const s of [1, -1]) {
+    wing(B, Math.floor(n * .15), r, [.55, .54, s * .36], [-1.0, .54, s * 1.85], 2.0, .5, .05, SKIN, 1);            // main wings
+    wing(B, Math.floor(n * .045), r, [-1.45, .54, s * .36], [-2.15, .54, s * 1.05], .85, .35, .05, SKIN, 1);       // tailplanes
+    wing(B, Math.floor(n * .06), r, [-1.15, .74, s * .26], [-1.95, 1.52, s * .50], 1.0, .4, .05, SKIN, 1);         // two fins, leaning outward
+    rod(B, Math.floor(n * .02), r, [-2.38, .53, s * .2], [-2.62, .53, s * .2], .17, DARK, 0);                       // exhausts
+    boxEach(Math.floor(n * .02), .95, .44, s * .43, .7, .26, .2, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, nx > .5 ? DARK : SKIN, nx <= .5 ? 1 : 0));   // air intakes
+    B.lamps.push([-2.68, .53, s * .2, 1, .5, .12], [-1.25, .54, s * 1.88, s > 0 ? .1 : 1, s > 0 ? 1 : .1, .1]);      // engine glow, wingtip lights
+  }
+  segLine(B, body, 90, -2.2, 2.5, 40); segLine(B, body, 270, -2.2, 2.5, 30);
+  return finish(B, r, { fwd: [1, 0, 0] });
+}
+function makeTrain(n, r) { const B = builder(), BODY = [.1, .45, .22], BLACK = [.13, .13, .15], RED = [.8, .12, .12], GOLD = [1, .8, .3], GLASS = [.2, .3, .45], STEEL = [.75, .77, .8];
+  const band = x => Math.abs(x - .2) < .045 || Math.abs(x - 1.25) < .045;
+  const boiler = skin(B, [[-.6, .5, .66, 1.66, 2], [2.0, .5, .66, 1.66, 2], [2.02, .54, .62, 1.70, 2], [2.32, .54, .62, 1.70, 2]], 1, Math.floor(n * .22), r, true, x => x > 2.0 ? [BLACK, 0] : band(x) ? [GOLD, 0] : [BODY, 1]);
+  latheEach([[.12, 1.6], [.12, 2.05], [.2, 2.2], [.2, 2.25], [0, 2.25]], Math.floor(n * .03), r, (x, y, z, nx, ny, nz) => put(B, x + 1.95, y, z, nx, ny, nz, BLACK, 0));          // chimney
+  sphereEach(Math.floor(n * .02), .75, 1.66, 0, .21, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, GOLD, 0));                                                          // dome
+  boxEach(Math.floor(n * .13), -1.05, 1.32, 0, .9, 1.4, 1.3, r, (x, y, z, nx, ny, nz) => { const win = y > 1.5 && y < 1.92 && (Math.abs(nz) > .5 ? Math.abs(x + 1.05) < .3 : Math.abs(z) < .48);
+    put(B, x, y, z, nx, ny, nz, win ? GLASS : BODY, win ? 0 : 1); });                                                                                                          // cab
+  boxEach(Math.floor(n * .03), -1.05, 2.06, 0, 1.15, .08, 1.5, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, BLACK, 0));
+  boxEach(Math.floor(n * .06), .35, .56, 0, 3.9, .14, 1.16, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, BLACK, 0));                                                // frame
+  boxEach(Math.floor(n * .10), -2.3, 1.0, 0, 1.2, .9, 1.24, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, ny > .5 ? BLACK : BODY, ny > .5 ? 0 : 1));                 // tender, coal on top
+  boxEach(Math.floor(n * .02), -2.3, .5, 0, 1.2, .12, 1.1, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, BLACK, 0));
+  for (let k = 0; k < n * .03; k++) { const u = r(), sd = 2 * r() - 1; put(B, 2.32 + .5 * u, .08 + .46 * (1 - u) * r(), sd * .6 * (1 - .7 * u), .6, .45, Math.sign(sd) * .6, RED, 0); }     // cowcatcher
+  let id = 0; const each = n * .26 / 16;
+  for (const [x, wr] of [[-.15, .44], [.78, .44], [1.71, .44], [2.2, .22], [-1.05, .3], [-2.6, .26], [-2.0, .26]]) for (const sz of [1, -1]) wheelAt(B, Math.floor(each * (wr > .4 ? 1.6 : .8)), r, x, sz * .64, wr, .12, ++id, STEEL, RED, [.4, .06, .06]);
+  B.lamps.push([2.42, 1.86, 0, 1, .95, .75]);
+  for (const a of [90, 35, 145]) segLine(B, boiler, a, -.55, 2.3, 24);
+  segBox(B, -1.05, 1.36, 0, 1.15, 1.48, 1.5); segBox(B, -2.3, 1.0, 0, 1.2, .9, 1.24);
+  for (const sz of [1, -1]) { segPath(B, [[-2.9, .64, sz * .6], [2.3, .64, sz * .6]], 0, .3, sz);
+    for (const x of [-.15, .78, 1.71]) segPath(B, Array.from({ length: 9 }, (_, i) => { const a = .3 + (Math.PI - .6) * i / 8; return [x + .5 * Math.cos(a), .44 + .5 * Math.sin(a), sz * .74]; }), 0, 0, sz); }
+  return finish(B, r, { fwd: [1, 0, 0] });
+}
+function makeSleigh(n, r) { const B = builder(), RED = [.8, .1, .14], GOLD = [1, .8, .3], SACK = [.5, .3, .14];
+  const tub = skin(B, [[-1.3, .44, .62, 1.62, 5], [-1.12, .56, .46, 1.70, 5], [-.7, .6, .38, 1.2, 5], [-.1, .6, .36, .98, 5], [.5, .58, .38, 1.0, 5], [.9, .52, .50, 1.22, 5], [1.15, .42, .74, 1.5, 4], [1.3, .26, 1.1, 1.6, 3]],
+    9, Math.floor(n * .5), r, true, (x, y, z, L) => { const trim = y > L.top(x) - .07; return [trim ? GOLD : RED, trim ? 0 : 1]; });
+  sphereEach(Math.floor(n * .12), -.5, 1.3, 0, .46, r, (x, y, z, nx, ny, nz) => put(B, x, 1.3 + (y - 1.3) * 1.15, z, nx, ny, nz, SACK, 0));                                    // the sack
+  boxEach(Math.floor(n * .03), .0, 1.12, .22, .34, .3, .34, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, Math.abs(x) < .05 || Math.abs(z - .22) < .05 ? GOLD : [.1, .55, .25], 0));
+  boxEach(Math.floor(n * .03), -.05, 1.1, -.25, .3, .26, .3, r, (x, y, z, nx, ny, nz) => put(B, x, y, z, nx, ny, nz, Math.abs(x + .05) < .05 || Math.abs(z + .25) < .05 ? GOLD : [.2, .35, .8], 0));
+  const path = q => { if (q < .72) return [-1.35 + 2.45 * q / .72, .04, 0, 1]; const a = (q - .72) / .28 * 4.3; return [1.1 + .36 * Math.sin(a), .40 - .36 * Math.cos(a), Math.sin(a), -Math.cos(a)]; };   // runners that curl up at the front
+  for (const s of [1, -1]) { for (let k = 0; k < n * .07; k++) { const [x, y, ux, uy] = path(r()), b = r() * TAU, c = Math.cos(b), q = Math.sin(b); put(B, x + .04 * c * ux, y + .04 * c * uy, s * .62 + .04 * q, c * ux, c * uy, q, GOLD, 0); }
+    for (const x of [-.95, -.1, .7]) rod(B, Math.floor(n * .01), r, [x, .06, s * .62], [x, .44, s * .52], .03, GOLD, 0);
+    segPath(B, Array.from({ length: 41 }, (_, i) => { const [x, y] = path(i / 40); return [x, y, s * .64]; }), 0, 0, s); }
+  for (const a of [52, 128]) segLine(B, tub, a, -1.25, 1.28, 30);
+  B.lamps.push([1.36, 1.68, 0, 1, .85, .5]);
+  return finish(B, r, { fwd: [1, 0, 0] });
+}
 const COUPE = { wr: .36, wx: 1.36, wz: .80, wwidth: .26, sill: .30, roof: [-1.0, .35], pillars: [-.35], head: [[2.17, .47, .55]], tail: [[-2.21, .60, .48]],
   body: [[-2.20, .62, .40, .66, 3.0], [-2.05, .86, .28, .80, 3.5], [-1.50, .93, .21, .85, 3.8], [-.70, .95, .19, .80, 4.0], [.10, .95, .19, .76, 4.0], [.90, .94, .19, .71, 3.6], [1.55, .90, .21, .62, 3.2], [2.00, .82, .25, .51, 2.8], [2.20, .60, .31, .44, 2.5]],
   cabin: [[-1.80, .58, .70, .82, 3], [-1.20, .72, .70, .99, 3], [-.50, .77, .70, 1.15, 3], [-.05, .77, .70, 1.18, 3], [.40, .75, .68, 1.04, 3], [.85, .70, .66, .76, 3], [1.02, .60, .64, .69, 3]] };
@@ -626,12 +705,16 @@ const PICKUP = { wr: .46, wx: 1.55, wz: .88, wwidth: .32, sill: .56, roof: [-.4,
   body: [[-2.50, .84, .62, 1.02, 4.0], [-2.40, .96, .48, 1.06, 4.5], [-1.60, .98, .44, 1.06, 4.5], [-.60, .98, .42, 1.06, 4.5], [.30, .98, .42, 1.10, 4.2], [1.20, .98, .42, 1.12, 4.0], [1.90, .96, .44, 1.08, 3.8], [2.32, .90, .50, .98, 3.4], [2.50, .74, .58, .86, 3.0]],
   cabin: [[-.62, .70, 1.02, 1.20, 3.5], [-.45, .84, 1.02, 1.66, 3.6], [.10, .86, 1.02, 1.74, 3.6], [.75, .86, 1.02, 1.72, 3.6], [1.15, .82, 1.02, 1.40, 3.2], [1.45, .74, 1.02, 1.16, 3.0]] };
 const car = (label, spec, paint) => ({ label, make: (n, r) => makeCar(spec, n, r), topper: false, repaint: true, paint, mode: 'outline', car: true });
+const sceneOf = p => p ? p.scene || (p.car ? 'drive' : 'spin') : '';      // where each shape starts: cars drive, aircraft fly, the rest spin
 const PRESETS = {
   coupe:   car('Sports car', COUPE, '#d41a1f'),
   sedan:   car('Sedan', SEDAN, '#c2c8d2'),
   hatch:   car('Hatchback', HATCH, '#f2c21a'),
   suv:     car('SUV', CROSSOVER, '#2a62d8'),
   pickup:  car('Pickup', PICKUP, '#e8ecf2'),
+  train:   { label: 'Steam train', make: (n, r) => makeTrain(n, r), topper: false, repaint: true, paint: '#0f7a3d', mode: 'outline', car: true, bulbs: 320 },
+  jet:     { label: 'Jet',     make: (n, r) => makeJet(n, r),     topper: false, repaint: true,  paint: '#8d99ae', mode: 'outline', scene: 'fly' },
+  sleigh:  { label: 'Sleigh',  make: (n, r) => makeSleigh(n, r),  topper: false, repaint: true,  paint: '#c8102e', mode: 'outline', scene: 'fly' },
   tree:    { label: 'Tree',    make: (n, r) => makeTree(n, r),    topper: true,  repaint: false, paint: '#1f9d3a', mode: 'spiral' },
   rocket:  { label: 'Rocket',  make: (n, r) => makeRocket(n, r),  topper: false, repaint: false, paint: '#e6ebf5', mode: 'spiral' },
   snowman: { label: 'Snowman', make: (n, r) => makeSnowman(n, r), topper: false, repaint: false, paint: '#ebf2ff', mode: 'spiral' },
@@ -792,20 +875,27 @@ function buildCaption() {
 }
 
 // ================================================================ ONE FRAME: FILL THE CHARACTER GRID
+function turn(yaw, bank, pitch, f) {         // a 3x3 rotation: line the nose up with +x, bank, pitch, then swing round to the final heading
+  const R = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
+  const mul = (A, B) => { const C = new Array(9); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i * 3 + j] = A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j]; return C; };
+  if (!bank && !pitch) return R(yaw);
+  const cb = Math.cos(bank), sb = Math.sin(bank), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  return mul(R(yaw - f), mul([cp, -sp, 0, sp, cp, 0, 0, 0, 1], mul([1, 0, 0, 0, cb, -sb, 0, sb, cb], R(f))));
+}
 function frame(t) {
-  const d = S.dense, top = d.size[1], aspect = CH / CW, drive = $('scene').value === 'drive', speedV = +$('spin').value;
+  const d = S.dense, top = d.size[1], aspect = CH / CW, drive = $('scene').value === 'drive', fly = $('scene').value === 'fly', moving = drive || fly, speedV = +$('spin').value;
   const pr = $('code').checked ? Math.max(6, Math.round(H * 0.2)) : 0, base = H - pr, VH = H - pr * 0.8; panelBase = pr ? base : 1e9;   // rows left for the picture
-  const ex = 0, ty = top * 0.3, ey = ty + 1.25, ez = 6.6;
+  const ex = 0, ty = top * 0.3 + (fly ? 1.0 : 0), ey = ty + 1.25, ez = 6.6;
   let fy = ty - ey, fz = -ez; const fl = Math.hypot(fy, fz); fy /= fl; fz /= fl;                    // camera looks down -Z, tilted
   const short = Math.min(H, W / aspect), vis = 2 * fl * Math.tan(15 * Math.PI / 180) / short;       // world units per row
-  const fit = Math.min(0.80 * vis * (W / aspect) / Math.hypot(d.size[0], d.size[2]), 0.74 * vis * VH / (top * (drive ? 1.2 : 1.9) + 0.4));
-  const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : 1) * +$('zoom').value;
+  const fit = Math.min(0.80 * vis * (W / aspect) / Math.hypot(d.size[0], d.size[2]), 0.74 * vis * VH / (top * (moving ? 1.2 : 1.9) + 0.4));
+  const F = (short / 2) / Math.tan(15 * Math.PI / 180) * Math.max(0.6, Math.min(2.2, fit)) * (drive ? (PW > PH ? 0.66 : 0.9) : fly ? (PW > PH ? 0.85 : 1.15) : 1) * +$('zoom').value;
   const Lx = -0.559, Ly = 0.652, Lz = 0.512, amb = 0.28, nr = ramp.length - 1;
-  const psi = 0.42 + S.drag, Dx = Math.cos(psi), Dz = Math.sin(psi), dist = drive ? Math.abs(speedV) * 11 * t : 0;   // driving: heading and distance covered
-  const yaw = drive ? d.fwdAngle - psi : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
-        ca = Math.cos(yaw), sa = Math.sin(yaw);
-  const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : 0;
-  const two = $('twoSided').checked, mirror = $('mirror').checked && !drive, intro = $('intro').checked;
+  const psi = 0.42 + S.drag + (fly ? 0.1 * Math.sin(0.45 * t) : 0), Dx = Math.cos(psi), Dz = Math.sin(psi), dist = moving ? Math.abs(speedV) * (fly ? 26 : 11) * t : 0;   // driving or flying: heading and distance covered
+  const yaw = moving ? d.fwdAngle - psi : S.raw.sway ? -0.35 + 0.45 * Math.sin(speedV * 1.6 * t) + S.drag : speedV * t + S.drag,   // words rock side to side so they stay readable
+        pv = fly ? top * 0.45 : 0, M = turn(yaw, fly ? 0.38 + 0.3 * Math.sin(0.8 * t) + 0.06 * Math.sin(1.9 * t) : 0, fly ? 0.07 * Math.sin(0.6 * t + 1) : 0, d.fwdAngle);   // flying: it leans its top towards you, banks, and noses up and down around its own middle
+  const bob = drive ? 0.012 * Math.sin(11 * t) + 0.008 * Math.sin(17.3 * t) : fly ? 1.2 + 0.09 * Math.sin(1.1 * t) : 0;                    // flying: its height above the snow
+  const two = $('twoSided').checked, mirror = $('mirror').checked && !moving, intro = $('intro').checked;
   const u = beatUnit(), bpm = +$('bpm').value, beat = bpm ? 0.92 + 0.6 * Math.pow(0.5 + 0.5 * Math.cos(TAU * t / u), 4) : 1;   // lights stay lit and flash brighter on every beat (the first beat is at time zero)
   const grow = intro ? top * 1.1 * t / (4 * u) : 1e9;                                                    // the model appears from the ground up
   depth.fill(1e30); chr.fill(0); emit.fill(0); halo.fill(0);
@@ -837,17 +927,20 @@ function frame(t) {
       if (roll && d.wheel[k]) { const wi = d.wheel[k] - 1, c = d.wheels[wi].c, cw = roll[wi][0], sw = roll[wi][1];        // spin the wheels
         const u = (la ? pz - c[2] : px - c[0]) * fs, v = py - c[1], u2 = (u * cw + v * sw) * fs, nu = (la ? qz : qx) * fs, nu2 = (nu * cw + qy * sw) * fs;
         py = c[1] - u * sw + v * cw; qy = -nu * sw + qy * cw; if (la) { pz = c[2] + u2; qz = nu2; } else { px = c[0] + u2; qx = nu2; } }
-      lit(px * ca + pz * sa, (py + bob) * my, -px * sa + pz * ca, qx * ca + qz * sa, qy * my, -qx * sa + qz * ca, C[o], C[o + 1], C[o + 2], dim, two, 0.7);
+      const hy = py - pv; lit(M[0] * px + M[1] * hy + M[2] * pz, (pv + M[3] * px + M[4] * hy + M[5] * pz + bob) * my, M[6] * px + M[7] * hy + M[8] * pz,
+          M[0] * qx + M[1] * qy + M[2] * qz, (M[3] * qx + M[4] * qy + M[5] * qz) * my, M[6] * qx + M[7] * qy + M[8] * qz, C[o], C[o + 1], C[o + 2], dim, two, 0.7);
     }
     const L = S.lights.data;
     for (let k = 0; k < S.lights.n; k++) { const o = k * 9; if (L[o + 7] > t) continue;                                   // not switched on yet
       const pulse = (L[o + 8] > 0 ? (0.62 + 0.38 * Math.sin(L[o + 8] * t + L[o + 6])) * beat : 1) * dim;
-      plot(L[o] * ca + L[o + 2] * sa, (L[o + 1] + bob) * my, -L[o] * sa + L[o + 2] * ca, L[o + 3] * pulse, L[o + 4] * pulse, L[o + 5] * pulse,
+      const lx = L[o], ly = L[o + 1] - pv, lz = L[o + 2];
+      plot(M[0] * lx + M[1] * ly + M[2] * lz, (pv + M[3] * lx + M[4] * ly + M[5] * lz + bob) * my, M[6] * lx + M[7] * ly + M[8] * lz, L[o + 3] * pulse, L[o + 4] * pulse, L[o + 5] * pulse,
            ramp[Math.max(1, Math.min(nr, Math.round((0.45 + 0.55 * pulse) * nr)))], pass ? 0 : 1); }
   }
   // the ground
   const half = d.size[la] / 2, Fx = Dx * half, Fz = Dz * half;
   for (let k = 0; k < floorP.length; k += 4) { let x = floorP[k], z = floorP[k + 1], s = floorP[k + 2], r = .30 * s, g = .36 * s, b = .50 * s, gl = floorP[k + 3];
+    if (fly) { x = wrap(x - Dx * dist, -9, 18); z = wrap(z - Dz * dist, -9, 13.5); r = .24 * s; g = .29 * s; b = .40 * s; }                         // snowfields sliding past far below
     if (drive) { x = wrap(x - Dx * dist, -9, 18); z = wrap(z - Dz * dist, -9, 13.5); r = .40 * s; g = .46 * s; b = .60 * s;
       const rx = x - Fx, rz = z - Fz, along = rx * Dx + rz * Dz, lat = Math.abs(-rx * Dz + rz * Dx);                    // headlight beam on the snow
       if (along > 0.05 && along < 7 && lat < 0.3 + 0.34 * along) { const q = 1.5 / (1 + along * 0.45); r += q; g += q * .93; b += q * .7; if (q > .55) gl = 43; } }
@@ -892,7 +985,7 @@ function frame(t) {
       const i = (r0 + y) * W + x, q = 0.22 + 0.4 * a; chr[i] = ramp[Math.max(1, Math.min(nr, Math.round(a * nr)))]; emit[i] = 0; col[i * 3] = q * .85; col[i * 3 + 1] = q * .92; col[i * 3 + 2] = q * 1.15; } }
   const from = $('from').value.trim();
   text(base - 3, 0, siteLabel() + ' . ' + S.name + (from ? ' . from ' + from : ''));
-  text(base - 2, 0, (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs);
+  text(base - 2, 0, (drive ? 'speed ' + (Math.abs(speedV) * 131).toFixed(0).padStart(3, '0') + ' km/h' : fly ? 'airspeed ' + (Math.abs(speedV) * 420).toFixed(0).padStart(3, '0') + ' kt' : 'rotation ' + deg.toFixed(2).padStart(6, '0')) + '    lights ' + String(lit_n).padStart(4) + '/' + S.lights.bulbs);
   text(base - 1, 0, 'points ' + (np + S.lights.n + floorP.length / 4 + ns).toLocaleString('en-US') + '    ' + (XMAS ? 'xmas in ' + XMAS + ' days' : 'merry christmas'));
   const capT = intro ? 12 * u : 5;
   if (capBmp && t > capT) { const rows = capBmp.rows, row0 = base - 5 - rows, upTo = Math.min(W, (t - capT) * W / 2);          // big caption made of characters, wiped on
@@ -1018,7 +1111,7 @@ function useText(str, live) {
 const RAW = {};
 function usePreset(key) {
   if (key === 'text') return useText($('word').value);
-  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; S.preset = key; if (!p.car) $('scene').value = 'spin'; else if (!was || !was.car) $('scene').value = 'drive'; markChips();   // cars drive, everything else spins, until you say otherwise
+  const p = PRESETS[key], was = PRESETS[S.preset]; if (!p) return; S.preset = key; if (sceneOf(p) !== sceneOf(was)) $('scene').value = sceneOf(p); markChips();   // a new kind of shape starts in its own scene; after that the choice is yours
   setModel(RAW[key] || (RAW[key] = p.make(120000, rng(3))), p.label.toLowerCase(), p); buildCaption(); setStatus('');   // a shape is built once; picking it again is instant
 }
 async function loadFiles(files) {
@@ -1095,7 +1188,7 @@ const fileTile = tile('file', 'Your 3D file', () => $('file').click(), plusThumb
 const SWATCHES = { Red: '#d41a1f', Green: '#0f7a3d', Blue: '#2a62d8', Yellow: '#f2c21a', Orange: '#ff7a1a', Pink: '#ff5fa2', White: '#f2f2f6', Silver: '#c2c8d2', Black: '#14161c' };
 for (const [name, h] of Object.entries(SWATCHES).reverse()) { const b = document.createElement('button'); b.className = 'sw'; b.dataset.k = h; b.style.background = h; b.title = name; b.setAttribute('aria-label', name);
   b.onclick = () => { $('repaint').checked = true; setVal('paint', h); }; $('swatches').prepend(b); }
-for (const o of $('scene').options) chip('scenes', o.value, o.textContent, () => setVal('scene', o.value));
+for (const o of $('scene').options) { chip('scenes', o.value, '', () => setVal('scene', o.value)); const w = o.textContent.split(' '); $('scenes').lastChild.innerHTML = w[0] + '<small>' + w.slice(1).join(' ') + '</small>'; }
 for (const o of $('format').options) { chip('sizes', o.value, '', () => setVal('format', o.value)); const [aw, ah] = o.dataset.ar.split('x');   // the same choice also sits under Customize everything
   $('sizes').lastChild.innerHTML = '<i style="width:' + aw + 'px;height:' + ah + 'px"></i>' + o.dataset.chip + '<small>' + o.dataset.sub + '</small>'; }
 for (const [k, L] of Object.entries(LOOKS)) { chip('looks', k, L.label, () => useLook(k)); const d = document.createElement('span'); d.className = 'dots';
